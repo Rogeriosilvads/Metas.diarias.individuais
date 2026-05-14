@@ -357,11 +357,11 @@ function getInitials(nome) {
 }
 
 function getStatus(meta) {
-  if (meta >= 3000) return { label:'Excelente', color:'#22c55e', bg:'#dcfce7' };
-  if (meta >= 2000) return { label:'Otimo',     color:'#3b82f6', bg:'#dbeafe' };
-  if (meta >= 1000) return { label:'Bom',       color:'#f59e0b', bg:'#fef3c7' };
-  if (meta >= 0)    return { label:'Atencao',   color:'#f97316', bg:'#ffedd5' };
-  return                   { label:'Negativo',  color:'#ef4444', bg:'#fee2e2' };
+  if (meta >= 3000) return { label:'Você Consegue', color:'#22c55e', bg:'#dcfce7' };
+  if (meta >= 2000) return { label:'Você Consegue',     color:'#3b82f6', bg:'#dbeafe' };
+  if (meta >= 1000) return { label:'Você Consegue',       color:'#f59e0b', bg:'#fef3c7' };
+  if (meta >= 0)    return { label:'Você Consegue',   color:'#f97316', bg:'#ffedd5' };
+  return                   { label:'Você Consegue',  color:'#ef4444', bg:'#fee2e2' };
 }
 
 function hashSeed(nome, data) {
