@@ -208,8 +208,7 @@
 
       <div style="margin-top:20px;padding:12px 14px;background:rgba(99,102,241,0.08);border-radius:8px;border:1px solid rgba(99,102,241,0.15);">
         <p style="color:#94a3b8;font-size:11px;line-height:1.6;">
-          💡 <strong style="color:#a5b4fc;">Senha padrão:</strong> primeironome + últimonome + 123<br>
-          Ex: <em>Ana Paula Santos</em> → <em>anasantos123</em>
+          💡 Em caso de dúvidas sobre sua senha, fale com o administrador.
         </p>
       </div>
     </div>
@@ -339,6 +338,7 @@
               <th>Senha</th>
               <th>Meta</th>
               <th>Status</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="admin-tbody"></tbody>
@@ -349,7 +349,8 @@
     <!-- Nota -->
     <div style="margin-top:16px;padding:14px 16px;background:rgba(99,102,241,0.08);border-radius:10px;border:1px solid rgba(99,102,241,0.2);">
       <p style="color:#94a3b8;font-size:12px;margin:0;">
-        🔐 <strong style="color:#a5b4fc;">Senha padrão:</strong> primeira palavra + última palavra + 123.
+        🔐 <strong style="color:#a5b4fc;">Senha individual:</strong> clique em "Editar senha" para definir. Se deixar em branco, usa o padrão: primeiro + último nome + 123.<br>
+        📊 A planilha .xlsx aceita 3 colunas: <strong style="color:#a5b4fc;">Nome | Meta | Senha</strong> (Senha é opcional).
       </p>
     </div>
 
@@ -362,21 +363,21 @@
 <script>
 // ── Dados demo ──────────────────────────────────────────────────
 let usuarios = [
-  { nome: "ANA PAULA CHAVES SOARES",         meta: 2535.14 },
-  { nome: "CARLA LETICIA SILVA ANDRADE",      meta: 2648.30 },
-  { nome: "ELISANGELA SATURNINO",             meta: 3746.85 },
-  { nome: "Fagner Magalhaes Fontes",          meta:  171.87 },
-  { nome: "Felipe Pereira Amaral",            meta: 3424.36 },
-  { nome: "Géssica dos Santos Araújo",        meta:  564.33 },
-  { nome: "IASMIN DOS SANTOS",               meta:  -32.09 },
-  { nome: "Iraci Santana Santos",             meta: 2138.14 },
-  { nome: "LUCAS PINA DOS SANTOS",           meta: 1540.62 },
-  { nome: "MARIA ANA DE JESUS DOS SANTOS C", meta: 1888.24 },
-  { nome: "ROGERIO DOS SANTOS",              meta:   46.98 },
-  { nome: "ROSEMARY DE JESUS SANTOS C",      meta: 2500.02 },
-  { nome: "TATIANE SOUZA FERNANDES",         meta: 3239.78 },
-  { nome: "THAIS DE JESUS DOS SANTOS",       meta:  494.30 },
-  { nome: "YANNI SANTOS GOTARDO",            meta:  338.76 },
+  { nome: "ANA PAULA CHAVES SOARES",         meta: 2535.14, senha: "" },
+  { nome: "CARLA LETICIA SILVA ANDRADE",      meta: 2648.30, senha: "" },
+  { nome: "ELISANGELA SATURNINO",             meta: 3746.85, senha: "" },
+  { nome: "Fagner Magalhaes Fontes",          meta:  171.87, senha: "" },
+  { nome: "Felipe Pereira Amaral",            meta: 3424.36, senha: "" },
+  { nome: "Géssica dos Santos Araújo",        meta:  564.33, senha: "" },
+  { nome: "IASMIN DOS SANTOS",               meta:  -32.09, senha: "" },
+  { nome: "Iraci Santana Santos",             meta: 2138.14, senha: "" },
+  { nome: "LUCAS PINA DOS SANTOS",           meta: 1540.62, senha: "" },
+  { nome: "MARIA ANA DE JESUS DOS SANTOS C", meta: 1888.24, senha: "" },
+  { nome: "ROGERIO DOS SANTOS",              meta:   46.98, senha: "" },
+  { nome: "ROSEMARY DE JESUS SANTOS C",      meta: 2500.02, senha: "" },
+  { nome: "TATIANE SOUZA FERNANDES",         meta: 3239.78, senha: "" },
+  { nome: "THAIS DE JESUS DOS SANTOS",       meta:  494.30, senha: "" },
+  { nome: "YANNI SANTOS GOTARDO",            meta:  338.76, senha: "" },
 ];
 
 let usuarioLogado = null;
@@ -397,8 +398,9 @@ const versiculoCache = {};
 })();
 
 // ── Utilitários ─────────────────────────────────────────────────
-function gerarSenha(nome) {
-  const p = nome.trim().split(/\s+/);
+function senhaEfetiva(u) {
+  if (u.senha && u.senha.trim() !== '') return u.senha.trim();
+  const p = u.nome.trim().split(/\s+/);
   return `${p[0].toLowerCase()}${p[p.length-1].toLowerCase()}123`;
 }
 
@@ -458,7 +460,7 @@ function handleLogin() {
   const senha = document.getElementById('inp-senha').value;
   const u = usuarios.find(u => u.nome.trim().split(/\s+/)[0].toLowerCase() === login);
   if (!u) { setErro('Usuário não encontrado.'); return; }
-  if (senha !== gerarSenha(u.nome)) { setErro('Senha incorreta.'); return; }
+  if (senha !== senhaEfetiva(u)) { setErro('Senha incorreta.'); return; }
   usuarioLogado = u;
   abrirPainel();
 }
@@ -583,22 +585,41 @@ function abrirAdmin() {
 function renderTabela() {
   const tbody = document.getElementById('admin-tbody');
   tbody.innerHTML = '';
-  usuarios.forEach(u => {
-    const st  = getStatus(u.meta);
-    const fmt = u.meta.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  usuarios.forEach((u, i) => {
+    const st    = getStatus(u.meta);
+    const fmt   = u.meta.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
     const login = u.nome.trim().split(/\s+/)[0].toLowerCase();
-    const senha = gerarSenha(u.nome);
+    const senha = senhaEfetiva(u);
+    const senhaPersonalizada = u.senha && u.senha.trim() !== '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="color:#f1f5f9;font-weight:600;">${u.nome}</td>
       <td><code class="code-login">${login}</code></td>
-      <td><code class="code-senha">${senha}</code></td>
+      <td>
+        <code class="code-senha" id="senha-txt-${i}">${senha}</code>
+        ${senhaPersonalizada ? '<span style="margin-left:6px;font-size:10px;color:#22c55e;font-weight:700;">✎ custom</span>' : ''}
+      </td>
       <td style="font-weight:800;color:${st.color};">${fmt}</td>
       <td><span class="badge" style="background:${st.bg};color:${st.color};">${st.label}</span></td>
+      <td>
+        <button onclick="editarSenha(${i})"
+          style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;font-family:Georgia,serif;cursor:pointer;">
+          ✎ Editar senha
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function editarSenha(i) {
+  const u = usuarios[i];
+  const atual = senhaEfetiva(u);
+  const nova = prompt(`Nova senha para ${u.nome.trim().split(/\s+/)[0]}:\n(atual: ${atual})`, u.senha || '');
+  if (nova === null) return; // cancelou
+  usuarios[i].senha = nova.trim();
+  renderTabela();
 }
 
 // ── Upload XLSX ──────────────────────────────────────────────────
@@ -616,7 +637,11 @@ function handleArquivo(e) {
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
       const novos = rows
         .filter(r => r[0] && r[1] !== undefined)
-        .map(r => ({ nome: String(r[0]).trim(), meta: parseFloat(r[1]) || 0 }));
+        .map(r => ({
+          nome:  String(r[0]).trim(),
+          meta:  parseFloat(r[1]) || 0,
+          senha: r[2] ? String(r[2]).trim() : '',
+        }));
 
       if (novos.length > 0) {
         usuarios = novos;
