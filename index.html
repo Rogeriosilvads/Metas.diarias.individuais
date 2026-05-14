@@ -141,6 +141,32 @@
       transition: opacity 0.2s;
     }
     .btn-upload:hover { opacity: 0.88; }
+
+    /* Cards de métricas no painel do usuário */
+    .metricas-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .metrica-card {
+      background: rgba(15,23,42,0.5);
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid rgba(99,102,241,0.1);
+    }
+    .metrica-label {
+      color: #64748b;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .metrica-valor {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
   </style>
 </head>
 <body>
@@ -208,17 +234,35 @@
     </div>
 
     <div class="card" style="margin-bottom:16px;">
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:32px;">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
         <div id="painel-avatar" style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;box-shadow:0 4px 20px rgba(99,102,241,0.4);flex-shrink:0;"></div>
         <div>
           <p style="color:#94a3b8;font-size:11px;margin:0 0 3px;text-transform:uppercase;letter-spacing:1px;">Bem-vindo(a)</p>
           <h3 id="painel-nome" style="color:#f1f5f9;font-size:16px;margin:0;font-weight:700;line-height:1.3;"></h3>
         </div>
       </div>
-      <div id="painel-meta-box" style="background:rgba(15,23,42,0.5);border-radius:16px;padding:32px 24px;text-align:center;">
+
+      <!-- Meta principal -->
+      <div id="painel-meta-box" style="background:rgba(15,23,42,0.5);border-radius:16px;padding:28px 24px;text-align:center;margin-bottom:16px;">
         <p style="color:#64748b;font-size:12px;margin:0 0 12px;text-transform:uppercase;letter-spacing:1px;">Meta do Dia</p>
         <div id="painel-valor" style="font-size:48px;font-weight:800;letter-spacing:-2px;margin-bottom:12px;"></div>
         <span id="painel-badge" class="badge" style="padding:5px 14px;font-size:12px;"></span>
+      </div>
+
+      <!-- Métricas adicionais da planilha -->
+      <div class="metricas-grid">
+        <div class="metrica-card">
+          <div class="metrica-label">📦 Vendas Brutas</div>
+          <div class="metrica-valor" id="painel-vendas-brutas">—</div>
+        </div>
+        <div class="metrica-card">
+          <div class="metrica-label">📉 Deduções</div>
+          <div class="metrica-valor" id="painel-deducoes" style="color:#f87171;">—</div>
+        </div>
+        <div class="metrica-card" style="grid-column: 1 / -1;">
+          <div class="metrica-label">✅ Resultado Líquido</div>
+          <div class="metrica-valor" id="painel-resultado" style="color:#34d399;font-size:18px;">—</div>
+        </div>
       </div>
     </div>
 
@@ -251,7 +295,7 @@
 
 <!-- ADMIN -->
 <div id="tela-admin" class="tela-admin hidden">
-  <div style="max-width:900px;margin:0 auto;">
+  <div style="max-width:1100px;margin:0 auto;">
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
       <div>
@@ -265,7 +309,7 @@
       <div style="font-size:40px;margin-bottom:12px;">📊</div>
       <h3 style="color:#f1f5f9;margin:0 0 8px;font-size:17px;">Atualizar Planilha</h3>
       <p style="color:#64748b;font-size:13px;margin:0 0 20px;">
-        Envie um .xlsx com colunas: <strong style="color:#a5b4fc;">Nome | Meta | Senha</strong> (Senha opcional)
+        Envie um .xlsx com colunas: <strong style="color:#a5b4fc;">Nome | Vendas Brutas | Deduções | Resultado | Meta</strong> (Senha opcional na col. 6)
       </p>
       <input id="file-input" type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleArquivo(event)" />
       <button class="btn-upload" id="btn-upload" onclick="document.getElementById('file-input').click()">
@@ -284,6 +328,9 @@
               <th>Nome</th>
               <th>Login (1º Nome)</th>
               <th>Senha</th>
+              <th>Vendas Brutas</th>
+              <th>Deduções</th>
+              <th>Resultado</th>
               <th>Meta</th>
               <th>Status</th>
               <th>Ações</th>
@@ -297,7 +344,7 @@
     <div style="margin-top:16px;padding:14px 16px;background:rgba(99,102,241,0.08);border-radius:10px;border:1px solid rgba(99,102,241,0.2);">
       <p style="color:#94a3b8;font-size:12px;margin:0;">
         🔐 <strong style="color:#a5b4fc;">Senha individual:</strong> clique em "Editar" para definir por usuário.<br>
-        📊 A planilha aceita 3 colunas: <strong style="color:#a5b4fc;">Nome | Meta | Senha</strong>
+        📊 A planilha aceita: <strong style="color:#a5b4fc;">Nome | Vendas Brutas | Deduções | Resultado | Meta | Senha (opcional)</strong>
       </p>
     </div>
 
@@ -305,23 +352,23 @@
 </div>
 
 <script>
-// ── Dados ─────────────────────────────────────────────────────────
+// ── Dados (importados da planilha vendas.xlsx) ─────────────────────
 var usuarios = [
-  { nome: "ANA PAULA CHAVES SOARES",         meta: 2535.14, senha: "7382" },
-  { nome: "CARLA LETICIA SILVA ANDRADE",      meta: 2648.30, senha: "4951" },
-  { nome: "ELISANGELA SATURNINO",             meta: 3746.85, senha: "2847" },
-  { nome: "Fagner Magalhaes Fontes",          meta:  171.87, senha: "6134" },
-  { nome: "Felipe Pereira Amaral",            meta: 3424.36, senha: "9463" },
-  { nome: "Gessica dos Santos Araujo",        meta:  564.33, senha: "3718" },
-  { nome: "IASMIN DOS SANTOS",               meta:  -32.09, senha: "5290" },
-  { nome: "Iraci Santana Santos",             meta: 2138.14, senha: "8641" },
-  { nome: "LUCAS PINA DOS SANTOS",           meta: 1540.62, senha: "1075" },
-  { nome: "MARIA ANA DE JESUS DOS SANTOS C", meta: 1888.24, senha: "4823" },
-  { nome: "ROGERIO DOS SANTOS",              meta:   46.98, senha: "7156" },
-  { nome: "ROSEMARY DE JESUS SANTOS C",      meta: 2500.02, senha: "3947" },
-  { nome: "TATIANE SOUZA FERNANDES",         meta: 3239.78, senha: "6512" },
-  { nome: "THAIS DE JESUS DOS SANTOS",       meta:  494.30, senha: "2384" },
-  { nome: "YANNI SANTOS GOTARDO",            meta:  338.76, senha: "8061" },
+  { nome: "ANA PAULA CHAVES SOARES",         vendasBrutas: 56967.92,  deducoes: 18940.85, resultado: 38027.07, meta: 2535.14, senha: "7382" },
+  { nome: "CARLA LETICIA SILVA ANDRADE",      vendasBrutas: 56157.77,  deducoes: 16433.26, resultado: 39724.51, meta: 2648.30, senha: "4951" },
+  { nome: "ELISANGELA SATURNINO",             vendasBrutas: 103963.94, deducoes: 47761.20, resultado: 56202.74, meta: 3746.85, senha: "2847" },
+  { nome: "Fagner Magalhaes Fontes",          vendasBrutas: 5187.31,   deducoes: 2609.19,  resultado: 2578.12,  meta:  171.87, senha: "6134" },
+  { nome: "Felipe Pereira Amaral",            vendasBrutas: 51633.77,  deducoes: 268.31,   resultado: 51365.46, meta: 3424.36, senha: "9463" },
+  { nome: "Géssica dos Santos Araújo",        vendasBrutas: 13559.11,  deducoes: 5094.17,  resultado: 8464.94,  meta:  564.33, senha: "3718" },
+  { nome: "IASMIN DOS SANTOS",               vendasBrutas: 6867.53,   deducoes: 7348.81,  resultado:  -481.28, meta:  -32.09, senha: "5290" },
+  { nome: "Iraci Santana Santos",             vendasBrutas: 51666.53,  deducoes: 19594.48, resultado: 32072.05, meta: 2138.14, senha: "8641" },
+  { nome: "LUCAS PINA DOS SANTOS",           vendasBrutas: 44551.26,  deducoes: 21441.99, resultado: 23109.27, meta: 1540.62, senha: "1075" },
+  { nome: "MARIA ANA DE JESUS DOS SANTOS C", vendasBrutas: 50013.68,  deducoes: 21690.15, resultado: 28323.53, meta: 1888.24, senha: "4823" },
+  { nome: "ROGERIO DOS SANTOS",              vendasBrutas: 3062.95,   deducoes: 2358.32,  resultado:   704.63, meta:   46.98, senha: "7156" },
+  { nome: "ROSEMARY DE JESUS SANTOS C",      vendasBrutas: 72250.28,  deducoes: 34750.05, resultado: 37500.23, meta: 2500.02, senha: "3947" },
+  { nome: "TATIANE SOUZA FERNANDES",         vendasBrutas: 88545.97,  deducoes: 39949.32, resultado: 48596.65, meta: 3239.78, senha: "6512" },
+  { nome: "THAIS DE JESUS DOS SANTOS",       vendasBrutas: 11215.94,  deducoes: 3801.44,  resultado:  7414.50, meta:  494.30, senha: "2384" },
+  { nome: "YANNI SANTOS GOTARDO",            vendasBrutas: 9508.06,   deducoes: 4426.59,  resultado:  5081.47, meta:  338.76, senha: "8061" },
 ];
 
 var SENHA_ADMIN = "140695";
@@ -357,11 +404,11 @@ function getInitials(nome) {
 }
 
 function getStatus(meta) {
-  if (meta >= 3000) return { label:'Você Consegue', color:'#22c55e', bg:'#dcfce7' };
-  if (meta >= 2000) return { label:'Você Consegue',     color:'#3b82f6', bg:'#dbeafe' };
-  if (meta >= 1000) return { label:'Você Consegue',       color:'#f59e0b', bg:'#fef3c7' };
-  if (meta >= 0)    return { label:'Você Consegue',   color:'#f97316', bg:'#ffedd5' };
-  return                   { label:'Você Consegue',  color:'#ef4444', bg:'#fee2e2' };
+  if (meta >= 3000) return { label:'Você Consegue', color:'#22c55e', bg:'rgba(34,197,94,0.12)' };
+  if (meta >= 2000) return { label:'Você Consegue', color:'#3b82f6', bg:'rgba(59,130,246,0.12)' };
+  if (meta >= 1000) return { label:'Você Consegue', color:'#f59e0b', bg:'rgba(245,158,11,0.12)' };
+  if (meta >= 0)    return { label:'Você Consegue', color:'#f97316', bg:'rgba(249,115,22,0.12)' };
+  return               { label:'Você Consegue', color:'#ef4444', bg:'rgba(239,68,68,0.12)' };
 }
 
 function hashSeed(nome, data) {
@@ -376,6 +423,10 @@ function hojeFormatado() {
 }
 function dataISO() {
   return new Date().toISOString().slice(0,10);
+}
+
+function brl(v) {
+  return Number(v).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
 }
 
 // ── Navegação ─────────────────────────────────────────────────────
@@ -413,7 +464,7 @@ function handleLogin() {
   for (var i = 0; i < usuarios.length; i++) {
     if (usuarios[i].nome.trim().split(/\s+/)[0].toLowerCase() === login) { u = usuarios[i]; break; }
   }
-  if (!u) { setErro('Usuario nao encontrado.'); return; }
+  if (!u) { setErro('Usuário não encontrado.'); return; }
   if (senha !== senhaEfetiva(u)) { setErro('Senha incorreta.'); return; }
   usuarioLogado = u;
   abrirPainel();
@@ -447,14 +498,13 @@ document.getElementById('inp-admin-senha').addEventListener('keydown', function(
 function abrirPainel() {
   var u   = usuarioLogado;
   var st  = getStatus(u.meta);
-  var fmt = u.meta.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
 
   document.getElementById('painel-data').textContent   = hojeFormatado();
   document.getElementById('painel-nome').textContent   = u.nome;
   document.getElementById('painel-avatar').textContent = getInitials(u.nome);
 
   var valorEl = document.getElementById('painel-valor');
-  valorEl.textContent                = fmt;
+  valorEl.textContent                = brl(u.meta);
   valorEl.style.background           = 'linear-gradient(135deg,' + st.color + ',' + st.color + 'aa)';
   valorEl.style.webkitBackgroundClip = 'text';
   valorEl.style.webkitTextFillColor  = 'transparent';
@@ -465,6 +515,11 @@ function abrirPainel() {
   badge.textContent      = st.label;
   badge.style.background = st.bg;
   badge.style.color      = st.color;
+
+  // Preenche métricas adicionais
+  document.getElementById('painel-vendas-brutas').textContent = brl(u.vendasBrutas);
+  document.getElementById('painel-deducoes').textContent      = brl(u.deducoes);
+  document.getElementById('painel-resultado').textContent     = brl(u.resultado);
 
   mostrar('tela-painel');
   carregarVersiculo(u.nome, dataISO());
@@ -505,7 +560,7 @@ async function buscarVersiculoIA(nome, data) {
     }
   } catch(e) {}
 
-  return { texto: 'O Senhor e o meu pastor e nada me faltara.', ref: 'Salmos 23:1' };
+  return { texto: 'O Senhor é o meu pastor e nada me faltará.', ref: 'Salmos 23:1' };
 }
 
 async function carregarVersiculo(nome, data) {
@@ -525,7 +580,7 @@ async function carregarVersiculo(nome, data) {
 
 // ── Admin tabela ──────────────────────────────────────────────────
 function abrirAdmin() {
-  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuarios cadastrados';
+  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários cadastrados';
   renderTabela();
   mostrar('tela-admin');
 }
@@ -536,7 +591,6 @@ function renderTabela() {
   for (var i = 0; i < usuarios.length; i++) {
     var u      = usuarios[i];
     var st     = getStatus(u.meta);
-    var fmt    = u.meta.toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
     var login  = u.nome.trim().split(/\s+/)[0].toLowerCase();
     var senha  = senhaEfetiva(u);
     var custom = u.senha && u.senha.trim() !== '';
@@ -548,7 +602,10 @@ function renderTabela() {
       '<td><code class="code-senha">' + senha + '</code>' +
         (custom ? '<span style="margin-left:6px;font-size:10px;color:#22c55e;font-weight:700;">custom</span>' : '') +
       '</td>' +
-      '<td style="font-weight:800;color:' + st.color + ';">' + fmt + '</td>' +
+      '<td style="color:#94a3b8;">' + brl(u.vendasBrutas) + '</td>' +
+      '<td style="color:#f87171;">' + brl(u.deducoes) + '</td>' +
+      '<td style="color:#34d399;font-weight:700;">' + brl(u.resultado) + '</td>' +
+      '<td style="font-weight:800;color:' + st.color + ';">' + brl(u.meta) + '</td>' +
       '<td><span class="badge" style="background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span></td>' +
       '<td><button onclick="editarSenha(' + i + ')" style="background:rgba(99,102,241,0.2);border:1px solid rgba(99,102,241,0.4);color:#a5b4fc;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Editar</button></td>';
     tbody.appendChild(tr);
@@ -580,14 +637,21 @@ function handleArquivo(e) {
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         if (r[0] && r[1] !== undefined) {
-          novos.push({ nome: String(r[0]).trim(), meta: parseFloat(r[1]) || 0, senha: r[2] ? String(r[2]).trim() : '' });
+          novos.push({
+            nome:         String(r[0]).trim(),
+            vendasBrutas: parseFloat(r[1]) || 0,
+            deducoes:     parseFloat(r[2]) || 0,
+            resultado:    parseFloat(r[3]) || 0,
+            meta:         parseFloat(r[4]) || 0,
+            senha:        r[5] ? String(r[5]).trim() : ''
+          });
         }
       }
       if (novos.length > 0) {
         usuarios = novos;
-        document.getElementById('admin-contagem').textContent = usuarios.length + ' usuarios cadastrados';
+        document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários cadastrados';
         renderTabela();
-        alert('✅ ' + novos.length + ' usuarios carregados!');
+        alert('✅ ' + novos.length + ' usuários carregados!');
       } else {
         alert('Nenhum dado encontrado.');
       }
