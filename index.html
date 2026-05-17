@@ -307,6 +307,17 @@
             <div id="at-meta-diaria" style="font-size:22px;font-weight:800;color:#a5b4fc;">—</div>
           </div>
         </div>
+        <!-- Metas de clientes e ticket meta -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div style="background:rgba(99,102,241,0.10);border:1px solid rgba(99,102,241,0.22);border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">🎯 Meta Clientes/Dia</div>
+            <div id="at-meta-qtd-dia" style="font-size:20px;font-weight:800;color:#a5b4fc;">—</div>
+          </div>
+          <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.22);border-radius:10px;padding:12px;">
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">💰 Ticket Meta</div>
+            <div id="at-meta-ticket-meta" style="font-size:20px;font-weight:800;color:#34d399;">—</div>
+          </div>
+        </div>
         <div style="background:rgba(15,23,42,0.4);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
           <span style="color:#64748b;font-size:11px;">Ticket médio: <strong id="at-ticket-medio" style="color:#94a3b8;">—</strong></span>
           <span style="color:#64748b;font-size:11px;">Média/dia: <strong id="at-media-dia" style="color:#94a3b8;">—</strong> atend.</span>
@@ -776,7 +787,9 @@ async function carregarDadosGSheets() {
         falta:      parseBRL(r[3]),
         metaDiaria: parseBRL(r[4]),
         login:      r[5] ? r[5].trim().toLowerCase() : r[0].trim().split(/\s+/)[0].toLowerCase(),
-        senha:      r[6] ? r[6].trim() : ''
+        senha:      r[6] ? r[6].trim() : '',
+        metaQtdDia:     r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0,
+        metaTicketMeta: r[8] ? parseBRL(r[8]) : 0
       });
     }
     if (novos.length > 0) {
@@ -792,21 +805,21 @@ async function carregarDadosGSheets() {
 
 function carregarDadosFallback() {
   usuarios = [
-  { nome: "ANA PAULA CHAVES SOARES",         saldoMetas: 56967.92,  venda: 21332.27, falta: 35635.65, metaDiaria:  2545.40, login: "ana",       senha: "7382" },
-  { nome: "CARLA LETICIA SILVA ANDRADE",      saldoMetas: 56157.77,  venda: 19061.62, falta: 37096.15, metaDiaria:  2649.73, login: "carla",     senha: "4951" },
-  { nome: "ELISANGELA SATURNINO",             saldoMetas: 103963.94, venda: 51075.06, falta: 52888.88, metaDiaria:  3777.78, login: "elisangela",senha: "2847" },
-  { nome: "Fagner Magalhaes Fontes",          saldoMetas: 5187.31,   venda: 4792.94,  falta:   394.37, metaDiaria:    28.17, login: "fagner",    senha: "6134" },
-  { nome: "Felipe Pereira Amaral",            saldoMetas: 51633.77,  venda:  268.31,  falta: 51365.46, metaDiaria:  3668.96, login: "felipe",    senha: "9463" },
-  { nome: "Géssica dos Santos Araújo",        saldoMetas: 13559.11,  venda: 5509.08,  falta:  8050.03, metaDiaria:   575.00, login: "gessica",   senha: "3718" },
-  { nome: "IASMIN DOS SANTOS",               saldoMetas: 6867.53,   venda: 7473.10,  falta:  -605.57, metaDiaria:   -43.26, login: "iasmin",    senha: "5290" },
-  { nome: "Iraci Santana Santos",             saldoMetas: 51666.53,  venda: 22712.34, falta: 28954.19, metaDiaria:  2068.16, login: "iraci",     senha: "8641" },
-  { nome: "LUCAS PINA DOS SANTOS",           saldoMetas: 44551.26,  venda: 22725.99, falta: 21825.27, metaDiaria:  1558.95, login: "lucas",     senha: "1075" },
-  { nome: "MARIA ANA DE JESUS DOS SANTOS C", saldoMetas: 50013.68,  venda: 26307.90, falta: 23705.78, metaDiaria:  1693.27, login: "maria",     senha: "4823" },
-  { nome: "ROGERIO DOS SANTOS",              saldoMetas: 3062.95,   venda: 2358.32,  falta:   704.63, metaDiaria:    50.33, login: "rogerio",   senha: "7156" },
-  { nome: "ROSEMARY DE JESUS SANTOS C",      saldoMetas: 72250.28,  venda: 36482.62, falta: 35767.66, metaDiaria:  2554.83, login: "rosemary",  senha: "3947" },
-  { nome: "TATIANE SOUZA FERNANDES",         saldoMetas: 88545.97,  venda: 39929.94, falta: 48616.03, metaDiaria:  3472.57, login: "tatiane",   senha: "6512" },
-  { nome: "THAIS DE JESUS DOS SANTOS",       saldoMetas: 11215.94,  venda: 4111.23,  falta:  7104.71, metaDiaria:   507.48, login: "thais",     senha: "2384" },
-  { nome: "YANNI SANTOS GOTARDO",            saldoMetas: 9508.06,   venda: 4636.45,  falta:  4871.61, metaDiaria:   347.97, login: "yanni",     senha: "8061" },
+  { nome: "ANA PAULA CHAVES SOARES",         saldoMetas: 56967.92,  venda: 21332.27, falta: 35635.65, metaDiaria:  2545.40, login: "ana",       senha: "7382", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "CARLA LETICIA SILVA ANDRADE",      saldoMetas: 56157.77,  venda: 19061.62, falta: 37096.15, metaDiaria:  2649.73, login: "carla",     senha: "4951", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "ELISANGELA SATURNINO",             saldoMetas: 103963.94, venda: 51075.06, falta: 52888.88, metaDiaria:  3777.78, login: "elisangela",senha: "2847", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "Fagner Magalhaes Fontes",          saldoMetas: 5187.31,   venda: 4792.94,  falta:   394.37, metaDiaria:    28.17, login: "fagner",    senha: "6134", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "Felipe Pereira Amaral",            saldoMetas: 51633.77,  venda:  268.31,  falta: 51365.46, metaDiaria:  3668.96, login: "felipe",    senha: "9463", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "Géssica dos Santos Araújo",        saldoMetas: 13559.11,  venda: 5509.08,  falta:  8050.03, metaDiaria:   575.00, login: "gessica",   senha: "3718", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "IASMIN DOS SANTOS",               saldoMetas: 6867.53,   venda: 7473.10,  falta:  -605.57, metaDiaria:   -43.26, login: "iasmin",    senha: "5290", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "Iraci Santana Santos",             saldoMetas: 51666.53,  venda: 22712.34, falta: 28954.19, metaDiaria:  2068.16, login: "iraci",     senha: "8641", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "LUCAS PINA DOS SANTOS",           saldoMetas: 44551.26,  venda: 22725.99, falta: 21825.27, metaDiaria:  1558.95, login: "lucas",     senha: "1075", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "MARIA ANA DE JESUS DOS SANTOS C", saldoMetas: 50013.68,  venda: 26307.90, falta: 23705.78, metaDiaria:  1693.27, login: "maria",     senha: "4823", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "ROGERIO DOS SANTOS",              saldoMetas: 3062.95,   venda: 2358.32,  falta:   704.63, metaDiaria:    50.33, login: "rogerio",   senha: "7156", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "ROSEMARY DE JESUS SANTOS C",      saldoMetas: 72250.28,  venda: 36482.62, falta: 35767.66, metaDiaria:  2554.83, login: "rosemary",  senha: "3947", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "TATIANE SOUZA FERNANDES",         saldoMetas: 88545.97,  venda: 39929.94, falta: 48616.03, metaDiaria:  3472.57, login: "tatiane",   senha: "6512", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "THAIS DE JESUS DOS SANTOS",       saldoMetas: 11215.94,  venda: 4111.23,  falta:  7104.71, metaDiaria:   507.48, login: "thais",     senha: "2384", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "YANNI SANTOS GOTARDO",            saldoMetas: 9508.06,   venda: 4636.45,  falta:  4871.61, metaDiaria:   347.97, login: "yanni",     senha: "8061", metaQtdDia: 0, metaTicketMeta: 0 },
   ];
   dadosCarregados = true;
 }
@@ -1423,13 +1436,24 @@ function abrirPainel() {
     var totalAtend    = comAtend.reduce(function(a,d){ return a + d.qtd;    }, 0);
     var totalValorQtd = comAtend.reduce(function(a,d){ return a + d.valor;  }, 0);
     var ticketMedio   = totalValorQtd / totalAtend;
-    var metaAtend     = Math.ceil(u.metaDiaria / ticketMedio);
     var mediaAtendDia = (totalAtend / comAtend.length).toFixed(1);
 
-    document.getElementById('at-total-mes').textContent   = totalAtend;
-    document.getElementById('at-meta-diaria').textContent = metaAtend;
-    document.getElementById('at-ticket-medio').textContent= brl(ticketMedio);
-    document.getElementById('at-media-dia').textContent   = mediaAtendDia;
+    // Meta de clientes/dia: usa o campo cadastrado se disponível, senão calcula
+    var metaQtdDia = (u.metaQtdDia && u.metaQtdDia > 0)
+      ? u.metaQtdDia
+      : Math.ceil(u.metaDiaria / ticketMedio);
+
+    // Ticket meta: usa o campo cadastrado se disponível, senão calcula
+    var metaTicketMeta = (u.metaTicketMeta && u.metaTicketMeta > 0)
+      ? u.metaTicketMeta
+      : (metaQtdDia > 0 ? (u.metaDiaria / metaQtdDia) : 0);
+
+    document.getElementById('at-total-mes').textContent        = totalAtend.toLocaleString('pt-BR');
+    document.getElementById('at-meta-diaria').textContent      = metaQtdDia + '/dia';
+    document.getElementById('at-ticket-medio').textContent     = brl(ticketMedio);
+    document.getElementById('at-media-dia').textContent        = mediaAtendDia;
+    document.getElementById('at-meta-qtd-dia').textContent     = metaQtdDia;
+    document.getElementById('at-meta-ticket-meta').textContent = brl(metaTicketMeta);
 
     document.getElementById('card-atendimentos').classList.remove('hidden');
   } else {
@@ -1631,7 +1655,9 @@ function handleArquivo(e) {
           falta:      parseBRL(String(r[3])) || 0,
           metaDiaria: parseBRL(String(r[4])) || 0,
           login:      r[5] ? String(r[5]).trim().toLowerCase() : String(r[0]).trim().split(/\s+/)[0].toLowerCase(),
-          senha:      r[6] ? String(r[6]).trim() : ''
+          senha:      r[6] ? String(r[6]).trim() : '',
+          metaQtdDia:     r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0,
+          metaTicketMeta: r[8] ? parseBRL(String(r[8])) : 0
         });
       }
       if (novos.length > 0) {
