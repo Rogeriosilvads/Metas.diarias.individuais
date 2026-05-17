@@ -639,6 +639,20 @@
 
     </div>
 
+    <!-- DIAGNÓSTICO -->
+    <div id="painel-diagnostico" style="display:none;background:rgba(15,23,42,0.9);border:1px solid rgba(245,158,11,0.4);border-radius:16px;padding:20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="color:#fbbf24;margin:0;font-size:14px;font-weight:700;">🔍 Diagnóstico — Planilha de Vendas</h3>
+        <button onclick="document.getElementById('painel-diagnostico').style.display='none'" style="background:none;border:none;color:#64748b;font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div id="diag-output" style="font-family:monospace;font-size:11px;color:#94a3b8;white-space:pre-wrap;max-height:320px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;"></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <button onclick="executarDiagnostico()" style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.35);color:#fbbf24;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;">
+        🔍 Diagnosticar planilha de vendas
+      </button>
+    </div>
+
     <div style="background:rgba(30,41,59,0.8);border:1px solid rgba(99,102,241,0.2);border-radius:20px;overflow:hidden;">
       <div style="padding:20px 24px;border-bottom:1px solid rgba(99,102,241,0.15);">
         <h3 style="color:#f1f5f9;margin:0;font-size:15px;font-weight:700;">Lista de Usuários e Credenciais</h3>
@@ -1610,6 +1624,85 @@ async function abrirAdmin() {
   renderTabela();
   renderRankingAtendimentos();
   mostrar('tela-admin');
+}
+
+async function executarDiagnostico() {
+  var painel = document.getElementById('painel-diagnostico');
+  var output = document.getElementById('diag-output');
+  painel.style.display = 'block';
+  output.textContent = 'Buscando planilha de vendas...\n';
+
+  var urls = [
+    'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/gviz/tq?tqx=out:csv&gid=' + SHEET_GID_DAILY,
+    'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/export?format=csv&gid=' + SHEET_GID_DAILY,
+  ];
+
+  var text = null;
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      output.textContent += '\nTentando URL ' + (i+1) + ':\n' + urls[i] + '\n';
+      var res = await fetch(urls[i]);
+      output.textContent += 'Status: ' + res.status + ' ' + res.statusText + '\n';
+      if (res.ok) {
+        text = await res.text();
+        output.textContent += 'Tamanho: ' + text.length + ' caracteres\n';
+        if (text.length > 10) { output.textContent += '✅ URL ' + (i+1) + ' funcionou!\n'; break; }
+      }
+    } catch(e) {
+      output.textContent += '❌ Erro: ' + (e.message || e) + '\n';
+    }
+  }
+
+  if (!text || text.length < 10) {
+    output.textContent += '\n❌ NENHUMA URL carregou dados.\nVerifique se a planilha está compartilhada como "Qualquer pessoa com o link pode ver".\nSheet ID: ' + SHEET_ID_VENDAS;
+    return;
+  }
+
+  // Mostra as primeiras 6 linhas brutas
+  var linhas = text.trim().split('\n').slice(0, 6);
+  output.textContent += '\n─── PRIMEIRAS ' + linhas.length + ' LINHAS BRUTAS ───\n';
+  linhas.forEach(function(l, i) { output.textContent += 'Linha ' + i + ': ' + l + '\n'; });
+
+  // Parse e mostra estrutura
+  var rows = parseCSV(text);
+  output.textContent += '\n─── PARSED (primeiras 4 linhas) ───\n';
+  rows.slice(0, 4).forEach(function(r, i) {
+    output.textContent += 'Row[' + i + ']: [' + r.map(function(c){ return '"' + c + '"'; }).join(', ') + ']\n';
+  });
+
+  // Tenta detectar colunas
+  var hRow0 = rows[0] || [];
+  var hRow1 = rows[1] || [];
+  var subRe = /valor|venda|emitida|qtd|atend|quantidade/i;
+  var h1EhSub = hRow1.some(function(c){ return subRe.test(String(c||'').trim()); });
+  output.textContent += '\n─── DETECÇÃO DE COLUNAS ───\n';
+  output.textContent += 'Sub-cabeçalho detectado: ' + h1EhSub + '\n';
+  output.textContent += 'Dados a partir da linha: ' + (h1EhSub ? 2 : 1) + '\n';
+  output.textContent += '\nColunas do cabeçalho (Row 0):\n';
+  hRow0.forEach(function(v, i){ if(v) output.textContent += '  [' + i + '] "' + v + '"\n'; });
+  if (h1EhSub) {
+    output.textContent += '\nSub-cabeçalho (Row 1):\n';
+    hRow1.forEach(function(v, i){ if(v) output.textContent += '  [' + i + '] "' + v + '"\n'; });
+  }
+
+  // Mapa de nomes
+  var nomeParaLogin = {};
+  usuarios.forEach(function(u) {
+    var p = u.nome.toUpperCase().split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    nomeParaLogin[p] = u.login;
+  });
+  output.textContent += '\nNomes mapeados (login): ' + JSON.stringify(nomeParaLogin) + '\n';
+
+  // Verifica quais nomes do cabeçalho batem
+  output.textContent += '\nVerificação de match dos nomes na planilha:\n';
+  hRow0.forEach(function(v, i) {
+    if (!v || i === 0) return;
+    var prim = v.toUpperCase().split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var login = nomeParaLogin[prim];
+    output.textContent += '  [' + i + '] "' + v + '" → primeiro="' + prim + '" → login=' + (login || '❌ NÃO ENCONTRADO') + '\n';
+  });
+
+  output.textContent += '\n✅ Cole este resultado no chat para análise.';
 }
 
 function renderRankingAtendimentos() {
