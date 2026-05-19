@@ -745,8 +745,12 @@ function csvUrl(gid) {
   return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&gid=' + gid;
 }
 // URL CSV pública — planilha de vendas diárias
+// Usa /export que tem melhor suporte a CORS para arquivos abertos localmente
 function csvUrlVendas(gid) {
-  // gviz/tq funciona com planilhas "Qualquer pessoa com o link" sem precisar publicar
+  return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/export?format=csv&gid=' + gid;
+}
+// URL alternativa via gviz (fallback)
+function csvUrlVendasAlt(gid) {
   return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/gviz/tq?tqx=out:csv&gid=' + gid;
 }
 
@@ -862,10 +866,28 @@ function carregarDadosFallback() {
 var vendasDiarias = {};
 async function carregarVendasDiarias() {
   try {
-    var url = csvUrlVendas(SHEET_GID_DAILY);
-    var res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    var text = await res.text();
+    // Tenta /export primeiro, depois gviz como fallback
+    var text = '';
+    var erroUrl = '';
+    try {
+      var url1 = csvUrlVendas(SHEET_GID_DAILY);
+      var res1 = await fetch(url1);
+      if (!res1.ok) throw new Error('HTTP ' + res1.status);
+      var t1 = await res1.text();
+      // Verifica se retornou HTML de login (planilha privada) em vez de CSV
+      if (t1.trim().startsWith('<')) throw new Error('Planilha privada ou não compartilhada');
+      text = t1;
+    } catch(e1) {
+      erroUrl = e1.message;
+      // Tenta URL alternativa (gviz)
+      var url2 = csvUrlVendasAlt(SHEET_GID_DAILY);
+      var res2 = await fetch(url2);
+      if (!res2.ok) throw new Error('HTTP ' + res2.status + ' (gviz)');
+      var t2 = await res2.text();
+      if (t2.trim().startsWith('<')) throw new Error('Planilha privada — compartilhe como "Qualquer pessoa com o link"');
+      text = t2;
+    }
+    var rows = parseCSV(text);
     var rows = parseCSV(text);
     if (rows.length < 2) throw new Error('sem dados');
 
@@ -1022,10 +1044,18 @@ async function carregarVendasDiarias() {
   } catch(e) {
     console.warn('⚠️ Erro vendas diárias:', e.message || e);
     gerarVendasExemplo();
-    // Exibe aviso no painel
     var avisoEl = document.getElementById('aviso-planilha');
     if (avisoEl) {
-      avisoEl.textContent = '⚠️ Não foi possível carregar a planilha de vendas. Verifique o compartilhamento.';
+      var msg = e.message || String(e);
+      var dica = '';
+      if (msg.includes('privada') || msg.includes('compartilh') || msg.includes('<')) {
+        dica = ' Abra a planilha → Compartilhar → "Qualquer pessoa com o link" → Visualizador.';
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+        dica = ' Erro de rede/CORS. Tente abrir o arquivo em um servidor local ou hospedado (não via file://).';
+      } else {
+        dica = ' Erro: ' + msg;
+      }
+      avisoEl.innerHTML = '⚠️ Planilha de vendas não carregou.' + dica;
       avisoEl.style.display = 'block';
     }
   }
