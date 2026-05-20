@@ -1204,7 +1204,7 @@ function abrirGrafico() {
   var melhor   = comVenda.reduce(function(a,d){ return d.valor > a.valor ? d : a; }, comVenda[0] || {valor:0,data:'--'});
   var pior     = comVenda.reduce(function(a,d){ return d.valor < a.valor ? d : a; }, comVenda[0] || {valor:0,data:'--'});
 
-  document.getElementById('grafico-subtitulo').textContent = u.nome.split(' ')[0] + ' — clique em um dia para detalhes';
+  document.getElementById('grafico-subtitulo').textContent = u.nome.split(' ')[0] + ' — clique em um dia para detalhes' + (window._adminModo ? ' 👁️ visão admin' : '');
   document.getElementById('resumo-bons').textContent       = bons;
   document.getElementById('resumo-fracos').textContent     = fracos;
   document.getElementById('resumo-media').textContent      = brl(media);
@@ -1395,6 +1395,12 @@ function fecharGrafico() {
   document.getElementById('modal-grafico').style.display = 'none';
   document.getElementById('cal-tooltip').style.display = 'none';
   document.body.style.overflow = '';
+  // Se o admin estava visualizando outro usuário, restaura o estado
+  if (window._adminModo) {
+    usuarioLogado = window._adminUsuarioReal;
+    window._adminModo = false;
+    window._adminUsuarioReal = undefined;
+  }
 }
 document.addEventListener('click', function(e) {
   if (e.target === document.getElementById('modal-grafico')) fecharGrafico();
@@ -1668,9 +1674,20 @@ function renderTabela() {
       '<td style="color:#34d399;font-weight:700;">' + brl(u.falta) + '</td>' +
       '<td style="font-weight:800;color:' + st.color + ';">' + brl(u.metaDiaria) + '</td>' +
       '<td><span class="badge" style="background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span></td>' +
-      '<td><button onclick="editarSenha(' + i + ')" style="background:rgba(249,115,22,0.2);border:1px solid rgba(249,115,22,0.4);color:#fed7aa;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Editar</button></td>';
+      '<td style="display:flex;gap:6px;align-items:center;">' +
+        '<button onclick="verPerformanceAdmin(' + i + ')" style="background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.4);color:#4ade80;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">📊 Performance</button>' +
+        '<button onclick="editarSenha(' + i + ')" style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#fed7aa;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🔑</button>' +
+      '</td>';
     tbody.appendChild(tr);
   }
+}
+
+function verPerformanceAdmin(i) {
+  // Marca que o admin está visualizando outro usuário
+  window._adminModo = true;
+  window._adminUsuarioReal = usuarioLogado; // guarda o admin (null)
+  usuarioLogado = usuarios[i];
+  abrirGrafico();
 }
 
 function editarSenha(i) {
