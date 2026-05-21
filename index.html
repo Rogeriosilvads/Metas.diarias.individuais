@@ -629,12 +629,20 @@
 <div id="tela-admin" class="tela-admin hidden">
   <div style="max-width:100%;margin:0 auto;">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:28px;">
       <div>
         <h1 style="color:#f1f5f9;font-size:24px;margin:0 0 4px;font-weight:800;">🛠️ Painel Administrador</h1>
         <p id="admin-contagem" style="color:#64748b;font-size:13px;margin:0;"></p>
       </div>
-      <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;background:rgba(10,32,32,0.7);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:8px 14px;">
+          <span style="color:#94a3b8;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">📅 Mês:</span>
+          <select id="sel-mes" onchange="trocarMes(this.value)"
+            style="background:transparent;border:none;color:#fed7aa;font-size:13px;font-weight:700;outline:none;cursor:pointer;font-family:Georgia,serif;">
+          </select>
+        </div>
+        <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
+      </div>
     </div>
 
     <!-- Upload cards -->
@@ -734,7 +742,30 @@
 <script>
 // ── Configuração Google Sheets ───────────────────────────────────────
 var SHEET_ID        = "1iWkNlmazuEXBzQzYUh8tRbZ9M9zlaJGwK7A-2epYhrA"; // Planilha principal (usuários)
-var SHEET_GID_MAIN  = "0";       // Aba principal (resumo mensal)
+
+// ── Mapa de abas por mês (gid de cada aba mensal) ────────────────────
+// Adicione novos meses aqui conforme forem criados na planilha
+var SHEET_MESES = [
+  
+  { label: 'Maio 2026',      gid: '0'         },
+  { label: 'Junho 2026',     gid: '42027147'  },
+  // { label: 'Julho 2026',  gid: 'INSIRA_GID' },
+];
+
+// Detecta o mês atual automaticamente (0=Jan, 1=Fev...)
+var _mesAtual = new Date().getMonth(); // 0-based
+var _anoAtual = new Date().getFullYear();
+// Encontra a entrada do mês atual no mapa
+var _mesEntrada = SHEET_MESES.find(function(m) {
+  return m.label.toLowerCase().indexOf(
+    _anoAtual.toString()
+  ) !== -1 && m.label.toLowerCase().indexOf(
+    ['janeiro','fevereiro','março','abril','maio','junho',
+     'julho','agosto','setembro','outubro','novembro','dezembro'][_mesAtual]
+  ) !== -1;
+});
+var SHEET_GID_MAIN  = _mesEntrada ? _mesEntrada.gid : SHEET_MESES[SHEET_MESES.length - 1].gid;
+var mesSelecionado  = SHEET_GID_MAIN; // gid do mês que está sendo exibido
 
 // Planilha separada para vendas diárias (calendário)
 var SHEET_ID_VENDAS  = "1Dp3bOOJQ__pkimuKNQrwds2l7WY381x-7XvGmRM2ogU";
@@ -742,8 +773,14 @@ var SHEET_GID_DAILY  = "0";     // Aba gid=0 da planilha de vendas
 
 // URL CSV pública — planilha principal (usuários)
 function csvUrl(gid) {
-  // gviz/tq funciona com planilhas "Qualquer pessoa com o link" sem precisar publicar
   return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:csv&gid=' + gid;
+}
+function csvUrlMes() {
+  return csvUrl(mesSelecionado);
+}
+function labelMesSelecionado() {
+  var m = SHEET_MESES.find(function(x){ return x.gid === mesSelecionado; });
+  return m ? m.label : 'Mês atual';
 }
 // URL CSV pública — planilha de vendas diárias
 // Usa /export que tem melhor suporte a CORS para arquivos abertos localmente
@@ -809,7 +846,7 @@ var dadosCarregados = false;
 
 async function carregarDadosGSheets() {
   try {
-    var url = csvUrl(SHEET_GID_MAIN);
+    var url = csvUrlMes();
     var res = await fetch(url);
     var text = await res.text();
     var rows = parseCSV(text);
@@ -1544,7 +1581,7 @@ function abrirPainel() {
   var u   = usuarioLogado;
   var st  = getStatus(u.metaDiaria);
 
-  document.getElementById('painel-data').textContent   = hojeFormatado();
+  document.getElementById('painel-data').textContent   = hojeFormatado() + '  •  ' + labelMesSelecionado();
   document.getElementById('painel-nome').textContent   = u.nome;
   document.getElementById('painel-avatar').textContent = getInitials(u.nome);
 
@@ -1666,13 +1703,37 @@ async function carregarVersiculo(nome, data) {
 
 // ── Admin tabela ──────────────────────────────────────────────────
 async function abrirAdmin() {
+  preencherSeletorMeses();
   document.getElementById('admin-contagem').textContent = 'Atualizando...';
   await carregarDadosGSheets();
   await carregarVendasDiarias();
-  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários cadastrados';
+  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários cadastrados — ' + labelMesSelecionado();
   renderTabela();
   renderRankingAtendimentos();
   mostrar('tela-admin');
+}
+
+function preencherSeletorMeses() {
+  var sel = document.getElementById('sel-mes');
+  if (!sel) return;
+  sel.innerHTML = '';
+  SHEET_MESES.forEach(function(m) {
+    var opt = document.createElement('option');
+    opt.value = m.gid;
+    opt.textContent = m.label;
+    if (m.gid === mesSelecionado) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+async function trocarMes(gid) {
+  mesSelecionado = gid;
+  document.getElementById('admin-contagem').textContent = 'Carregando ' + labelMesSelecionado() + '...';
+  await carregarDadosGSheets();
+  await carregarVendasDiarias();
+  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários — ' + labelMesSelecionado();
+  renderTabela();
+  renderRankingAtendimentos();
 }
 
 function renderRankingAtendimentos() {
