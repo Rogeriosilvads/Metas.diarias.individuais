@@ -684,6 +684,7 @@
               <th>Login</th>
               <th>Senha</th>
               <th>Saldo de Metas</th>
+              <th>Venda</th>
               <th>Falta</th>
               <th>Meta/Dia</th>
               <th>Status</th>
@@ -812,26 +813,70 @@ async function carregarDadosGSheets() {
     var res = await fetch(url);
     var text = await res.text();
     var rows = parseCSV(text);
+
+    // ── Detecta layout de colunas pelo cabeçalho ─────────────────────
+    // Com coluna C (Venda):    Colaborador|Saldo|Venda|Falta|MetaDia|Login|Senha...
+    // Sem coluna C (antigo):   Colaborador|Saldo|Falta|MetaDia|Login|Senha...
+    var headerRow = rows[0] || [];
+    var temColunaVenda = false;
+    for (var h = 0; h < headerRow.length; h++) {
+      var hVal = (headerRow[h] || '').trim().toUpperCase()
+                  .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if (hVal === 'VENDA' || hVal === 'VENDA REALIZADA' || hVal === 'VENDAS') {
+        temColunaVenda = true;
+        break;
+      }
+    }
+    // Fallback: se col[2] da primeira linha de dados parecer valor monetário
+    // e col[3] também, provavelmente tem coluna Venda
+    if (!temColunaVenda && rows.length > 1) {
+      var primeiraLinhaDados = rows[1];
+      var v2 = parseBRL(primeiraLinhaDados[2]);
+      var v3 = parseBRL(primeiraLinhaDados[3]);
+      if (v2 !== 0 && v3 !== 0) temColunaVenda = true;
+    }
+    console.log('📋 Layout detectado — coluna Venda (C):', temColunaVenda ? 'SIM' : 'NÃO');
+
     var novos = [];
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (!r[0] || r[0].toUpperCase() === 'COLABORADOR') continue;
+      var colVenda, colFalta, colMeta, colLogin, colSenha, colQtd, colTicket;
+      if (temColunaVenda) {
+        // A: Colaborador | B: Saldo | C: Venda | D: Falta | E: Meta Diária | F: Login | G: Senha | H: MetaQtd | I: MetaTicket
+        colVenda  = parseBRL(r[2]);
+        colFalta  = parseBRL(r[3]);
+        colMeta   = parseBRL(r[4]);
+        colLogin  = r[5] ? r[5].trim().toLowerCase() : r[0].trim().split(/\s+/)[0].toLowerCase();
+        colSenha  = r[6] ? r[6].trim() : '';
+        colQtd    = r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0;
+        colTicket = r[8] ? parseBRL(r[8]) : 0;
+      } else {
+        // A: Colaborador | B: Saldo | C: Falta | D: Meta Diária | E: Login | F: Senha | G: MetaQtd | H: MetaTicket
+        colVenda  = 0;
+        colFalta  = parseBRL(r[2]);
+        colMeta   = parseBRL(r[3]);
+        colLogin  = r[4] ? r[4].trim().toLowerCase() : r[0].trim().split(/\s+/)[0].toLowerCase();
+        colSenha  = r[5] ? r[5].trim() : '';
+        colQtd    = r[6] ? (Math.round(parseFloat(String(r[6]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0;
+        colTicket = r[7] ? parseBRL(r[7]) : 0;
+      }
       novos.push({
-        nome:       r[0].trim(),
-        saldoMetas: parseBRL(r[1]),
-        venda:      parseBRL(r[2]),
-        falta:      parseBRL(r[3]),
-        metaDiaria: parseBRL(r[4]),
-        login:      r[5] ? r[5].trim().toLowerCase() : r[0].trim().split(/\s+/)[0].toLowerCase(),
-        senha:      r[6] ? r[6].trim() : '',
-        metaQtdDia:     r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0,
-        metaTicketMeta: r[8] ? parseBRL(r[8]) : 0
+        nome:           r[0].trim(),
+        saldoMetas:     parseBRL(r[1]),
+        venda:          colVenda,
+        falta:          colFalta,
+        metaDiaria:     colMeta,
+        login:          colLogin,
+        senha:          colSenha,
+        metaQtdDia:     colQtd,
+        metaTicketMeta: colTicket
       });
     }
     if (novos.length > 0) {
       usuarios = novos;
       dadosCarregados = true;
-      console.log('✅ ' + novos.length + ' usuários carregados do Google Sheets');
+      console.log('✅ ' + novos.length + ' usuários carregados do Google Sheets (layout: ' + (temColunaVenda ? 'com Venda' : 'sem Venda') + ')');
     }
   } catch(e) {
     console.warn('Erro ao carregar Google Sheets, usando dados locais:', e);
@@ -1518,8 +1563,16 @@ function abrirPainel() {
 
   // Preenche métricas adicionais
   document.getElementById('painel-vendas-brutas').textContent = brl(u.saldoMetas);
-  document.getElementById('painel-deducoes').textContent      = brl(u.venda);
   document.getElementById('painel-resultado').textContent     = brl(u.falta);
+  // Card de Venda Realizada: só exibe se tiver valor (coluna C presente na planilha)
+  var cardVenda = document.getElementById('painel-deducoes');
+  var cardVendaBox = cardVenda ? cardVenda.closest('.metrica-card') : null;
+  if (u.venda !== 0) {
+    cardVenda.textContent = brl(u.venda);
+    if (cardVendaBox) cardVendaBox.style.display = '';
+  } else {
+    if (cardVendaBox) cardVendaBox.style.display = 'none';
+  }
 
   mostrar('tela-painel');
   carregarVersiculo(u.nome, dataISO());
@@ -1697,7 +1750,8 @@ function renderTabela() {
         (custom ? '<span style="margin-left:4px;font-size:9px;color:#22c55e;font-weight:700;">✓</span>' : '') +
       '</td>' +
       '<td style="color:#94a3b8;font-weight:600;">' + brl(u.saldoMetas) + '</td>' +
-      '<td style="color:#34d399;font-weight:700;">' + brl(u.falta) + '</td>' +
+      (u.venda ? '<td style="color:#34d399;font-weight:700;">' + brl(u.venda) + '</td>' : '<td style="color:#475569;">—</td>') +
+      '<td style="color:#f87171;font-weight:700;">' + brl(u.falta) + '</td>' +
       '<td style="font-weight:800;color:' + st.color + ';">' + brl(u.metaDiaria) + '</td>' +
       '<td>' + renderBarraStatus(u) + '</td>' +
       '<td style="display:flex;gap:6px;align-items:center;">' +
@@ -1750,20 +1804,46 @@ function handleArquivo(e) {
     try {
       var wb   = XLSX.read(evt.target.result, { type: 'binary' });
       var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+      // Detecta layout: com ou sem coluna C (Venda)
+      var headerRowX = rows[0] || [];
+      var temVendaX = false;
+      for (var hx = 0; hx < headerRowX.length; hx++) {
+        var hv = String(headerRowX[hx] || '').trim().toUpperCase()
+                  .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        if (hv === 'VENDA' || hv === 'VENDA REALIZADA' || hv === 'VENDAS') { temVendaX = true; break; }
+      }
       var novos = [];
       for (var i = 0; i < rows.length; i++) {
         var r = rows[i];
         if (!r[0] || String(r[0]).trim().toUpperCase() === 'COLABORADOR') continue;
+        var xVenda, xFalta, xMeta, xLogin, xSenha, xQtd, xTicket;
+        if (temVendaX) {
+          xVenda  = parseBRL(String(r[2])) || 0;
+          xFalta  = parseBRL(String(r[3])) || 0;
+          xMeta   = parseBRL(String(r[4])) || 0;
+          xLogin  = r[5] ? String(r[5]).trim().toLowerCase() : String(r[0]).trim().split(/\s+/)[0].toLowerCase();
+          xSenha  = r[6] ? String(r[6]).trim() : '';
+          xQtd    = r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0;
+          xTicket = r[8] ? parseBRL(String(r[8])) : 0;
+        } else {
+          xVenda  = 0;
+          xFalta  = parseBRL(String(r[2])) || 0;
+          xMeta   = parseBRL(String(r[3])) || 0;
+          xLogin  = r[4] ? String(r[4]).trim().toLowerCase() : String(r[0]).trim().split(/\s+/)[0].toLowerCase();
+          xSenha  = r[5] ? String(r[5]).trim() : '';
+          xQtd    = r[6] ? (Math.round(parseFloat(String(r[6]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0;
+          xTicket = r[7] ? parseBRL(String(r[7])) : 0;
+        }
         novos.push({
-          nome:       String(r[0]).trim(),
-          saldoMetas: parseBRL(String(r[1])) || 0,
-          venda:      parseBRL(String(r[2])) || 0,
-          falta:      parseBRL(String(r[3])) || 0,
-          metaDiaria: parseBRL(String(r[4])) || 0,
-          login:      r[5] ? String(r[5]).trim().toLowerCase() : String(r[0]).trim().split(/\s+/)[0].toLowerCase(),
-          senha:      r[6] ? String(r[6]).trim() : '',
-          metaQtdDia:     r[7] ? (Math.round(parseFloat(String(r[7]).replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0,
-          metaTicketMeta: r[8] ? parseBRL(String(r[8])) : 0
+          nome:           String(r[0]).trim(),
+          saldoMetas:     parseBRL(String(r[1])) || 0,
+          venda:          xVenda,
+          falta:          xFalta,
+          metaDiaria:     xMeta,
+          login:          xLogin,
+          senha:          xSenha,
+          metaQtdDia:     xQtd,
+          metaTicketMeta: xTicket
         });
       }
       if (novos.length > 0) {
