@@ -944,7 +944,7 @@ function carregarDadosFallback() {
   { nome: "Fagner Magalhaes Fontes",          saldoMetas: 5187.31,   venda: 5848.43,  falta:  -661.12, metaDiaria:   -28.74, login: "fagner",    senha: "6134", metaQtdDia: 0, metaTicketMeta: 0 },
   { nome: "Felipe Pereira Amaral",            saldoMetas: 51633.77,  venda:  268.31,  falta: 51365.46, metaDiaria:  3668.96, login: "felipe",    senha: "9463", metaQtdDia: 0, metaTicketMeta: 0 },
   { nome: "Géssica dos Santos Araújo",        saldoMetas: 13559.11,  venda: 6382.12,  falta:  7176.99, metaDiaria:   598.08, login: "gessica",   senha: "3718", metaQtdDia: 0, metaTicketMeta: 0 },
-  { nome: "IASMIN DOS SANTOS",               saldoMetas: 6867.53,   venda: 7818.80,  falta:  -951.27, metaDiaria:   -43.24, login: "iasmin",    senha: "5290", metaQtdDia: 0, metaTicketMeta: 0 },
+  { nome: "IASMIM DOS SANTOS",               saldoMetas: 6867.53,   venda: 7818.80,  falta:  -951.27, metaDiaria:   -43.24, login: "iasmim",    senha: "5290", metaQtdDia: 0, metaTicketMeta: 0 },
   { nome: "Iraci Santana Santos",             saldoMetas: 51666.53,  venda: 30480.00, falta: 21186.53, metaDiaria:  2118.65, login: "iraci",     senha: "8641", metaQtdDia: 0, metaTicketMeta: 0 },
   { nome: "LUCAS PINA DOS SANTOS",           saldoMetas: 44551.26,  venda: 26389.73, falta: 18161.53, metaDiaria:  1513.46, login: "lucas",     senha: "1075", metaQtdDia: 0, metaTicketMeta: 0 },
   { nome: "MARIA ANA DE JESUS DOS SANTOS C", saldoMetas: 50013.68,  venda: 30845.01, falta: 19168.67, metaDiaria:  1742.61, login: "maria",     senha: "4823", metaQtdDia: 0, metaTicketMeta: 0 },
@@ -1046,7 +1046,7 @@ async function carregarVendasDiarias() {
     var primeiraLinhaData = row1EhSubtitulo ? 2 : 1;
 
     // ── Propaga nomes mesclados (células vazias herdam o nome anterior) ─
-    // Ex: ["DATA","TATIANE","","IASMIN",""] → ["DATA","TATIANE","TATIANE","IASMIN","IASMIN"]
+    // Ex: ["DATA","TATIANE","","IASMIM",""] → ["DATA","TATIANE","TATIANE","IASMIM","IASMIM"]
     var nomesPropagados = [];
     var ultimoNome = '';
     for (var c = 0; c < headerNomes.length; c++) {
