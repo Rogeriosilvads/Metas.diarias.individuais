@@ -634,7 +634,15 @@
         <h1 style="color:#f1f5f9;font-size:24px;margin:0 0 4px;font-weight:800;">🛠️ Painel Administrador</h1>
         <p id="admin-contagem" style="color:#64748b;font-size:13px;margin:0;"></p>
       </div>
-      <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;background:rgba(10,32,32,0.7);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:8px 14px;">
+          <span style="color:#94a3b8;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">📅 Mês:</span>
+          <select id="sel-mes" onchange="trocarMes(this.value)"
+            style="background:transparent;border:none;color:#fed7aa;font-size:13px;font-weight:700;outline:none;cursor:pointer;font-family:inherit;">
+          </select>
+        </div>
+        <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
+      </div>
     </div>
 
     <!-- Upload cards -->
@@ -1711,7 +1719,31 @@ async function carregarVersiculo(nome, data) {
 }
 
 // ── Admin tabela ──────────────────────────────────────────────────
+function preencherSeletorMeses() {
+  var sel = document.getElementById('sel-mes');
+  if (!sel) return;
+  sel.innerHTML = '';
+  SHEET_MESES.forEach(function(m) {
+    var opt = document.createElement('option');
+    opt.value = m.gid;
+    opt.textContent = m.label;
+    if (m.gid === mesSelecionado) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+async function trocarMes(gid) {
+  mesSelecionado = gid;
+  document.getElementById('admin-contagem').textContent = 'Carregando ' + labelMesSelecionado() + '...';
+  await carregarDadosGSheets();
+  await carregarVendasDiarias();
+  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários — ' + labelMesSelecionado();
+  renderTabela();
+  renderRankingAtendimentos();
+}
+
 async function abrirAdmin() {
+  preencherSeletorMeses();
   document.getElementById('admin-contagem').textContent = 'Atualizando...';
   await carregarDadosGSheets();
   await carregarVendasDiarias();
