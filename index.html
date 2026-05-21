@@ -833,13 +833,13 @@ var SHEET_ID        = "1iWkNlmazuEXBzQzYUh8tRbZ9M9zlaJGwK7A-2epYhrA"; // Planilh
 var SHEET_GID_MAIN  = "0";       // Aba principal (resumo mensal)
 
 // Planilha de vendas diárias (abas por mês)
-var SHEET_ID_VENDAS  = "1iWkNlmazuEXBzQzYUh8tRbZ9M9zlaJGwK7A-2epYhrA";
-var SHEET_GID_DAILY  = "707275109"; // Aba atual (Maio 2026)
+var SHEET_ID_VENDAS  = "1Dp3bOOJQ__pkimuKNQrwds2l7WY381x-7XvGmRM2ogU";
+var SHEET_GID_DAILY  = "0"; // Aba atual
 
-// Meses disponíveis: {nome, gid} — detectado automaticamente ou definido aqui
+// Meses disponíveis — adicione novos meses aqui conforme criar abas na planilha de vendas
 var mesesDisponiveis = [
   { nome: "Maio 2026",  gid: "707275109" },
-  { nome: "Junho 2026", gid: "0" }
+  { nome: "Junho 2026", gid: "42027147" }
 ];
 var mesSelecionado = mesesDisponiveis[1]; // Junho 2026 (mais recente)
 
@@ -856,40 +856,12 @@ function csvUrlVendasAlt(gid) {
   return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/gviz/tq?tqx=out:csv&gid=' + gid;
 }
 
-// Busca abas disponíveis na planilha de vendas via feed JSON público
+// Busca abas disponíveis — por ora usa lista estática, feed JSON não é necessário
 async function carregarAbas() {
-  try {
-    var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID_VENDAS + '/feeds/worksheets/default/public/full?alt=json';
-    var res = await fetch(url);
-    if (!res.ok) throw new Error('feed indisponível');
-    var json = await res.json();
-    var entries = json.feed.entry || [];
-    var abas = entries.map(function(e) {
-      var title = e.title.$t;
-      // Extrai gid do link
-      var link = e.link ? e.link.find(function(l){ return l.rel.endsWith('#worksheetsfeed'); }) : null;
-      var wsLink = e.link ? e.link.find(function(l){ return l.type === 'application/atom+xml'; }) : null;
-      var href = wsLink ? wsLink.href : '';
-      var gidMatch = href.match(/\/([^\/]+)\/public/);
-      // GID é o id numérico do entry
-      var idParts = e.id.$t.split('/');
-      var wsId = idParts[idParts.length - 1];
-      return { nome: title, gid: wsId };
-    });
-    // Filtra apenas abas com padrão de mês (ex: "Maio 2026")
-    var abasMes = abas.filter(function(a) {
-      return /[A-Za-zÀ-ú]+ \d{4}/.test(a.nome);
-    });
-    if (abasMes.length > 0) {
-      mesesDisponiveis = abasMes;
-      mesSelecionado = abasMes[abasMes.length - 1]; // mais recente
-      SHEET_GID_DAILY = mesSelecionado.gid;
-      console.log('📅 Abas encontradas:', abasMes.map(function(a){ return a.nome; }).join(', '));
-    }
-  } catch(e) {
-    console.warn('Não foi possível carregar lista de abas automaticamente:', e.message);
-    // Mantém mesesDisponiveis estático definido acima
-  }
+  // GIDs definidos manualmente (feed público do Google Sheets é instável)
+  // Maio 2026 = 707275109, Junho 2026 = 0
+  // Já definidos em mesesDisponiveis acima
+  console.log('📅 Mês ativo:', mesSelecionado.nome, '(gid=' + mesSelecionado.gid + ')');
 }
 
 function parseBRL(v) {
@@ -1025,8 +997,9 @@ async function carregarVendasDiarias() {
       if (t2.trim().startsWith('<')) throw new Error('Planilha privada — compartilhe como "Qualquer pessoa com o link"');
       text = t2;
     }
+    console.log('📊 Carregando vendas:', mesSelecionado.nome, 'gid=' + mesSelecionado.gid);
     var rows = parseCSV(text);
-    var rows = parseCSV(text);
+    console.log('📊 Linhas recebidas:', rows.length, '| Primeiras cols:', rows[0] ? rows[0].slice(0,4) : 'vazio');
     if (rows.length < 2) throw new Error('sem dados');
 
     // ── Monta mapa: nome normalizado → login ─────────────────────────
