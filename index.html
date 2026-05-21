@@ -634,15 +634,7 @@
         <h1 style="color:#f1f5f9;font-size:24px;margin:0 0 4px;font-weight:800;">🛠️ Painel Administrador</h1>
         <p id="admin-contagem" style="color:#64748b;font-size:13px;margin:0;"></p>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:8px;background:rgba(10,32,32,0.7);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:8px 14px;">
-          <span style="color:#94a3b8;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">📅 Mês:</span>
-          <select id="sel-mes" onchange="trocarMes(this.value)"
-            style="background:transparent;border:none;color:#fed7aa;font-size:13px;font-weight:700;outline:none;cursor:pointer;font-family:Georgia,serif;">
-          </select>
-        </div>
-        <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
-      </div>
+      <button class="btn-sec" style="padding:10px 20px;border-radius:10px;font-size:13px;" onclick="irLogin()">← Voltar ao Login</button>
     </div>
 
     <!-- Upload cards -->
@@ -746,30 +738,45 @@ var SHEET_ID        = "1iWkNlmazuEXBzQzYUh8tRbZ9M9zlaJGwK7A-2epYhrA"; // Planilh
 // ── Mapa de abas por mês (gid de cada aba mensal) ────────────────────
 // Adicione novos meses aqui conforme forem criados na planilha
 var SHEET_MESES = [
-  
-  { label: 'Maio 2026',      gid: '0'         },
-  { label: 'Junho 2026',     gid: '42027147'  },
-  // { label: 'Julho 2026',  gid: 'INSIRA_GID' },
+  { label: 'Maio 2026',  gid: '0'        }, // aba principal — gid=0
+  { label: 'Junho 2026', gid: '42027147' }, // aba "Junho 2026" — gid=42027147
+  // Adicione novos meses aqui: { label: 'Julho 2026', gid: 'INSIRA_GID' },
 ];
 
-// Detecta o mês atual automaticamente (0=Jan, 1=Fev...)
-var _mesAtual = new Date().getMonth(); // 0-based
+// Detecta automaticamente a aba do mês atual
+// Cada entrada de SHEET_MESES tem um índice (0 = primeira aba = mês mais antigo cadastrado)
+// O sistema encontra a aba cujo label contém o mês/ano atual; se não encontrar, usa a última
+var _mesesPT = ['janeiro','fevereiro','marco','abril','maio','junho',
+                'julho','agosto','setembro','outubro','novembro','dezembro'];
+var _mesAtual = new Date().getMonth(); // 0=jan
 var _anoAtual = new Date().getFullYear();
-// Encontra a entrada do mês atual no mapa
+function _normalizar(s) {
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
 var _mesEntrada = SHEET_MESES.find(function(m) {
-  return m.label.toLowerCase().indexOf(
-    _anoAtual.toString()
-  ) !== -1 && m.label.toLowerCase().indexOf(
-    ['janeiro','fevereiro','março','abril','maio','junho',
-     'julho','agosto','setembro','outubro','novembro','dezembro'][_mesAtual]
-  ) !== -1;
+  var n = _normalizar(m.label);
+  return n.indexOf(_anoAtual.toString()) !== -1 &&
+         n.indexOf(_mesesPT[_mesAtual]) !== -1;
 });
-var SHEET_GID_MAIN  = _mesEntrada ? _mesEntrada.gid : SHEET_MESES[SHEET_MESES.length - 1].gid;
-var mesSelecionado  = SHEET_GID_MAIN; // gid do mês que está sendo exibido
+// Se o mês atual não estiver no mapa, usa a última aba disponível
+var SHEET_GID_MAIN = _mesEntrada ? _mesEntrada.gid : SHEET_MESES[SHEET_MESES.length - 1].gid;
+var mesSelecionado = SHEET_GID_MAIN;
 
 // Planilha separada para vendas diárias (calendário)
 var SHEET_ID_VENDAS  = "1Dp3bOOJQ__pkimuKNQrwds2l7WY381x-7XvGmRM2ogU";
-var SHEET_GID_DAILY  = "0";     // Aba gid=0 da planilha de vendas
+
+// Mapa de abas de VENDAS por mês — o label deve bater exatamente com SHEET_MESES
+// Para descobrir o gid: abra a planilha, clique na aba e veja o número na URL (?gid=NÚMERO)
+var SHEET_VENDAS_MESES = [
+  { label: 'Maio 2026',  gid: '0'              },
+  { label: 'Junho 2026', gid: '703832053'       },
+];
+
+// Retorna o gid de vendas correspondente ao mês selecionado
+function gidVendasAtual() {
+  var m = SHEET_VENDAS_MESES.find(function(x){ return x.label === labelMesSelecionado(); });
+  return m ? m.gid : SHEET_VENDAS_MESES[0].gid;
+}
 
 // URL CSV pública — planilha principal (usuários)
 function csvUrl(gid) {
@@ -952,7 +959,8 @@ async function carregarVendasDiarias() {
     var text = '';
     var erroUrl = '';
     try {
-      var url1 = csvUrlVendas(SHEET_GID_DAILY);
+      var _gidV = gidVendasAtual();
+      var url1 = csvUrlVendas(_gidV);
       var res1 = await fetch(url1);
       if (!res1.ok) throw new Error('HTTP ' + res1.status);
       var t1 = await res1.text();
@@ -962,7 +970,8 @@ async function carregarVendasDiarias() {
     } catch(e1) {
       erroUrl = e1.message;
       // Tenta URL alternativa (gviz)
-      var url2 = csvUrlVendasAlt(SHEET_GID_DAILY);
+      var _gidV2 = gidVendasAtual();
+      var url2 = csvUrlVendasAlt(_gidV2);
       var res2 = await fetch(url2);
       if (!res2.ok) throw new Error('HTTP ' + res2.status + ' (gviz)');
       var t2 = await res2.text();
@@ -1703,7 +1712,6 @@ async function carregarVersiculo(nome, data) {
 
 // ── Admin tabela ──────────────────────────────────────────────────
 async function abrirAdmin() {
-  preencherSeletorMeses();
   document.getElementById('admin-contagem').textContent = 'Atualizando...';
   await carregarDadosGSheets();
   await carregarVendasDiarias();
@@ -1713,28 +1721,6 @@ async function abrirAdmin() {
   mostrar('tela-admin');
 }
 
-function preencherSeletorMeses() {
-  var sel = document.getElementById('sel-mes');
-  if (!sel) return;
-  sel.innerHTML = '';
-  SHEET_MESES.forEach(function(m) {
-    var opt = document.createElement('option');
-    opt.value = m.gid;
-    opt.textContent = m.label;
-    if (m.gid === mesSelecionado) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-async function trocarMes(gid) {
-  mesSelecionado = gid;
-  document.getElementById('admin-contagem').textContent = 'Carregando ' + labelMesSelecionado() + '...';
-  await carregarDadosGSheets();
-  await carregarVendasDiarias();
-  document.getElementById('admin-contagem').textContent = usuarios.length + ' usuários — ' + labelMesSelecionado();
-  renderTabela();
-  renderRankingAtendimentos();
-}
 
 function renderRankingAtendimentos() {
   // Monta ranking de atendimentos para todos os usuários que têm dados de qtd
@@ -2144,13 +2130,5 @@ function calcularFaltaAgora() {
   }
 }
 </script>
-  <!-- Módulo Folgas — abre via botão no admin -->
-<button onclick="document.getElementById('mod-folgas').style.display='block'"
-  style="margin-top:12px;width:100%;...">
-  📅 Controle de Folgas e Atestados
-</button>
-<div id="mod-folgas" style="display:none">
-  <!-- cola aqui o conteúdo do módulo acima -->
-</div>
 </body>
 </html>
