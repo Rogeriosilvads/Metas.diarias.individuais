@@ -1000,25 +1000,63 @@ async function carregarVendasDiarias() {
 
     // ── Detecta cabeçalho de 1 ou 2 linhas ──────────────────────────
     // Planilha com células mescladas gera no CSV:
-    //   row0: ["DATA","TATIANE","","ROSEMARY","","CARLA","",...]
+    //   row0: ["DATA","TATIANE","","ROSEMARY","","IASMIN","",...]
     //   row1: ["","valor do dia","vendas emitidas","valor do dia",...]
-    // Quando é 1 linha só, os nomes já estão junto com os tipos.
-    var headerRow0 = rows[0];
+    // Estratégia: verifica se row1 contém subtítulos OU se row0 não tem datas
+    var headerRow0 = rows[0] || [];
     var headerRow1 = rows[1] || [];
-    var subTitulosRe = /valor|venda|emitida|qtd|atend|quantidade/i;
+    var headerRow2 = rows[2] || [];
+
+    // Regex ampla para subtítulos — inclui variações comuns
+    var subTitulosRe = /valor|venda|emitida|qtd|atend|quantidade|ticket|meta|bruto|líquido|liquido/i;
+
+    // Verifica se row1 tem subtítulos
     var row1EhSubtitulo = headerRow1.some(function(cell) {
       return subTitulosRe.test(String(cell || '').trim());
     });
+
+    // Fallback: se row1 não parece subtítulo mas row0 também não tem datas,
+    // testa se a 1ª célula não vazia da row1 parece data (dd/mm)
+    if (!row1EhSubtitulo) {
+      var row1PrimeiraCel = '';
+      for (var _t = 0; _t < headerRow1.length; _t++) {
+        var _v = String(headerRow1[_t] || '').trim();
+        if (_v) { row1PrimeiraCel = _v; break; }
+      }
+      // Se row1 começa com uma data, não é subtítulo
+      // Se row0 col0 é "DATA" e row1 col0 é vazio/outra coisa sem data, pode ser subtítulo
+      var row0Col0 = String(headerRow0[0] || '').trim().toUpperCase();
+      if (row0Col0 === 'DATA' || row0Col0 === 'DIA' || row0Col0 === 'DATE') {
+        // row0 é o cabeçalho de nomes; verifica se row1 parece ser subtítulo
+        // testando se NÃO começa com data
+        var row1Col0 = String(headerRow1[0] || '').trim();
+        var row1TemData = /^\d{2}\/\d{2}/.test(row1Col0);
+        if (!row1TemData) {
+          // row1 não começa com data — pode ser subtítulo
+          // confirma verificando se row2 começa com data
+          var row2Col0 = String(headerRow2[0] || '').trim();
+          if (/^\d{2}\/\d{2}/.test(row2Col0) || /^\d{5}/.test(row2Col0)) {
+            row1EhSubtitulo = true;
+          }
+        }
+      }
+    }
+
     var headerNomes       = headerRow0;
     var primeiraLinhaData = row1EhSubtitulo ? 2 : 1;
 
     // ── Propaga nomes mesclados (células vazias herdam o nome anterior) ─
-    // Ex: ["DATA","TATIANE","","ROSEMARY",""] → ["DATA","TATIANE","TATIANE","ROSEMARY","ROSEMARY"]
+    // Ex: ["DATA","TATIANE","","IASMIN",""] → ["DATA","TATIANE","TATIANE","IASMIN","IASMIN"]
     var nomesPropagados = [];
     var ultimoNome = '';
     for (var c = 0; c < headerNomes.length; c++) {
       var celNome = (headerNomes[c] || '').trim();
-      if (celNome) ultimoNome = celNome;
+      // Ignora células que são subtítulos (valor/qtd) na linha de nomes
+      if (celNome && !subTitulosRe.test(celNome) && celNome.toUpperCase() !== 'DATA') {
+        ultimoNome = celNome;
+      } else if (!celNome) {
+        // Célula vazia — mantém o último nome (mesclagem)
+      }
       nomesPropagados.push(ultimoNome);
     }
 
@@ -1030,8 +1068,17 @@ async function carregarVendasDiarias() {
     for (var c = 1; c < nomesPropagados.length; c++) {
       var nomeProp  = nomesPropagados[c].toUpperCase();
       if (!nomeProp) continue;
-      var primeiroH = nomeProp.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      // Tenta match por primeiro nome, depois nome completo normalizado
+      var primeiroH  = nomeProp.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       var loginFound = nomeParaLogin[primeiroH];
+      // Fallback: busca por qualquer palavra do nome
+      if (!loginFound) {
+        var palavras = nomeProp.split(' ');
+        for (var _p = 0; _p < palavras.length && !loginFound; _p++) {
+          var pal = palavras[_p].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+          if (pal.length >= 3) loginFound = nomeParaLogin[pal];
+        }
+      }
       if (!loginFound) continue;
       if (!pessoaColCount[loginFound]) pessoaColCount[loginFound] = 0;
       pessoaColCount[loginFound]++;
@@ -1043,6 +1090,8 @@ async function carregarVendasDiarias() {
     }
 
     console.log('🔍 Cabeçalho duplo:', row1EhSubtitulo, '| Dados a partir da linha:', primeiraLinhaData);
+    console.log('🔍 nomesPropagados:', JSON.stringify(nomesPropagados.slice(0, 20)));
+    console.log('🔍 nomeParaLogin:', JSON.stringify(nomeParaLogin));
     console.log('💰 Colunas valor:', JSON.stringify(valColMap));
     console.log('👥 Colunas qtd:',  JSON.stringify(qtdColMap));
 
@@ -1977,18 +2026,29 @@ function handleVendasXlsx(e) {
       });
 
       // ── Detecta cabeçalho de 1 ou 2 linhas ────────────────────────
-      // Planilha com células mescladas: row0=nomes, row1=subtipos (valor/qtd)
-      var hRow0 = rows[0];
+      // Detecta cabeçalho 1 ou 2 linhas robustamente
+      var hRow0 = rows[0] || [];
       var hRow1 = rows[1] || [];
-      var subRe = /valor|venda|emitida|qtd|atend|quantidade/i;
+      var hRow2 = rows[2] || [];
+      var subRe = /valor|venda|emitida|qtd|atend|quantidade|ticket|meta|bruto|liquido/i;
       var h1EhSub = hRow1.some(function(cell) { return subRe.test(String(cell||'').trim()); });
+      if (!h1EhSub) {
+        var _h0c0 = String(hRow0[0]||'').trim().toUpperCase();
+        if (_h0c0 === 'DATA' || _h0c0 === 'DIA') {
+          var _h1c0 = String(hRow1[0]||'').trim();
+          var _h2c0 = String(hRow2[0]||'').trim();
+          if (!/^\d{2}\/\d{2}/.test(_h1c0) && !/^\d{5}/.test(_h1c0)) {
+            if (/^\d{2}\/\d{2}/.test(_h2c0) || /^\d{5}/.test(_h2c0)) h1EhSub = true;
+          }
+        }
+      }
       var primeiraLD = h1EhSub ? 2 : 1;
 
-      // Propaga nomes mesclados (células vazias herdam o nome anterior)
+      // Propaga nomes mesclados — ignora células que são subtítulos
       var nomesProp = [], ultN = '';
       for (var c = 0; c < hRow0.length; c++) {
         var cn = String(hRow0[c] || '').trim();
-        if (cn) ultN = cn;
+        if (cn && !subRe.test(cn) && cn.toUpperCase() !== 'DATA') { ultN = cn; }
         nomesProp.push(ultN);
       }
 
