@@ -54,7 +54,8 @@
     .ftype-atestado { background:rgba(59,130,246,0.15);  color:#93c5fd;  border:1px solid rgba(59,130,246,0.3); }
     .ftype-falta-j  { background:rgba(245,158,11,0.15);  color:#fbbf24;  border:1px solid rgba(245,158,11,0.3); }
     .ftype-falta-i  { background:rgba(239,68,68,0.15);   color:#f87171;  border:1px solid rgba(239,68,68,0.3); }
-    .ftype-ferias   { background:rgba(139,92,246,0.15);  color:#c4b5fd;  border:1px solid rgba(139,92,246,0.3); }
+    .ftype-ferias        { background:rgba(139,92,246,0.15);  color:#c4b5fd;  border:1px solid rgba(139,92,246,0.3); }
+    .ftype-compensacao   { background:rgba(20,184,166,0.15);  color:#5eead4;  border:1px solid rgba(20,184,166,0.3); }
     .ftype-badge    { display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;white-space:nowrap; }
     .folgas-metrica { background:rgba(8,28,28,0.55);border-radius:12px;padding:14px 16px;border:1px solid rgba(249,115,22,0.1);flex:1;min-width:100px; }
     .folgas-row:hover td { background:rgba(249,115,22,0.04); }
@@ -330,6 +331,7 @@
             <option value="falta-j">⚠️ Falta just.</option>
             <option value="falta-i">❌ Falta injust.</option>
             <option value="ferias">🏖️ Férias</option>
+            <option value="compensacao">⚖️ Compensação</option>
           </select>
         </div>
       </div>
@@ -735,7 +737,9 @@ function normTipo(v){
     'atestado':'atestado', 'atestado medico':'atestado', 'medico':'atestado', 'medica':'atestado', 'cid':'atestado',
     'falta-j':'falta-j', 'falta justificada':'falta-j', 'falta j':'falta-j',
     'falta-i':'falta-i', 'falta injustificada':'falta-i', 'falta i':'falta-i', 'falta':'falta-i',
-    'ferias':'ferias', 'ferias programadas':'ferias', 'vacation':'ferias', 'recesso':'ferias'
+    'ferias':'ferias', 'ferias programadas':'ferias', 'vacation':'ferias', 'recesso':'ferias',
+    'compensacao':'compensacao', 'compensação':'compensacao', 'comp':'compensacao',
+    'banco de horas':'compensacao', 'folga compensatoria':'compensacao', 'folga compensatória':'compensacao'
   };
   return m[s] || 'falta-i';
 }
@@ -925,8 +929,8 @@ function renderAusenciasUsuario(u){
   var card=document.getElementById('painel-ausencias-card');
   if(!minhas.length){card.classList.add('hidden');return;}
   card.classList.remove('hidden');
-  var TN={'folga':'🌴 Folga','atestado':'🏥 Atestado','falta-j':'⚠️ Falta just.','falta-i':'❌ Falta injust.','ferias':'🏖️ Férias'};
-  var cores={'folga':'#4ade80','atestado':'#93c5fd','falta-j':'#fbbf24','falta-i':'#f87171','ferias':'#c4b5fd'};
+  var TN={'folga':'🌴 Folga','atestado':'🏥 Atestado','falta-j':'⚠️ Falta just.','falta-i':'❌ Falta injust.','ferias':'🏖️ Férias','compensacao':'⚖️ Compensação'};
+  var cores={'folga':'#4ade80','atestado':'#93c5fd','falta-j':'#fbbf24','falta-i':'#f87171','ferias':'#c4b5fd','compensacao':'#5eead4'};
   document.getElementById('painel-ausencias-lista').innerHTML=minhas.map(function(a){
     var ativo=a.inicio<=hoje&&a.fim>=hoje;
     var cor=cores[a.tipo]||'#93c5fd';
@@ -1021,11 +1025,11 @@ function renderCalendario(){
       }
     }
   });
-  var _tipoIcons={'folga':'🌴','atestado':'🏥','falta-j':'⚠️','falta-i':'❌','ferias':'🏖️'};
-  var _tipoCores={'folga':'#4ade80','atestado':'#93c5fd','falta-j':'#fbbf24','falta-i':'#f87171','ferias':'#c4b5fd'};
-  var _tipoBg={'folga':'rgba(34,197,94,0.18)','atestado':'rgba(59,130,246,0.18)','falta-j':'rgba(245,158,11,0.18)','falta-i':'rgba(239,68,68,0.18)','ferias':'rgba(139,92,246,0.18)'};
-  var _tipoBd={'folga':'rgba(34,197,94,0.5)','atestado':'rgba(59,130,246,0.5)','falta-j':'rgba(245,158,11,0.5)','falta-i':'rgba(239,68,68,0.5)','ferias':'rgba(139,92,246,0.5)'};
-  var _tipoLabels={'folga':'Folga','atestado':'Atestado','falta-j':'Falta justificada','falta-i':'Falta injustificada','ferias':'Férias'};
+  var _tipoIcons={'folga':'🌴','atestado':'🏥','falta-j':'⚠️','falta-i':'❌','ferias':'🏖️','compensacao':'⚖️'};
+  var _tipoCores={'folga':'#4ade80','atestado':'#93c5fd','falta-j':'#fbbf24','falta-i':'#f87171','ferias':'#c4b5fd','compensacao':'#5eead4'};
+  var _tipoBg={'folga':'rgba(34,197,94,0.18)','atestado':'rgba(59,130,246,0.18)','falta-j':'rgba(245,158,11,0.18)','falta-i':'rgba(239,68,68,0.18)','ferias':'rgba(139,92,246,0.18)','compensacao':'rgba(20,184,166,0.18)'};
+  var _tipoBd={'folga':'rgba(34,197,94,0.5)','atestado':'rgba(59,130,246,0.5)','falta-j':'rgba(245,158,11,0.5)','falta-i':'rgba(239,68,68,0.5)','ferias':'rgba(139,92,246,0.5)','compensacao':'rgba(20,184,166,0.5)'};
+  var _tipoLabels={'folga':'Folga','atestado':'Atestado','falta-j':'Falta justificada','falta-i':'Falta injustificada','ferias':'Férias','compensacao':'Compensação'};
   for(var b=0;b<prim;b++){var v=document.createElement('div');v.style.cssText='height:44px;border-radius:8px;';grid.appendChild(v);}
   for(var d=1;d<=ult;d++){
     var dd=String(d).padStart(2,'0'); var mm=String(mes+1).padStart(2,'0'); var ch=dd+'/'+mm;
@@ -1262,7 +1266,8 @@ var FTIPOS = {
   'atestado': {label:'🏥 Atestado',     cls:'ftype-atestado'},
   'falta-j':  {label:'⚠️ Falta just.',  cls:'ftype-falta-j'},
   'falta-i':  {label:'❌ Falta injust.', cls:'ftype-falta-i'},
-  'ferias':   {label:'🏖️ Férias',       cls:'ftype-ferias'}
+  'ferias':      {label:'🏖️ Férias',        cls:'ftype-ferias'},
+  'compensacao': {label:'⚖️ Compensação',   cls:'ftype-compensacao'}
 };
 var MNOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -1299,11 +1304,17 @@ function renderFolgas(){
   var totD=lista.reduce(function(a,r){return a+r.dias;},0);
   var qtAt=lista.filter(function(r){return r.tipo==='atestado';}).length;
   var qtF=lista.filter(function(r){return r.tipo.startsWith('falta');}).length;
+  var qtC=lista.filter(function(r){return r.tipo==='compensacao';}).length;
+  var qtFg=lista.filter(function(r){return r.tipo==='folga';}).length;
+  var qtFe=lista.filter(function(r){return r.tipo==='ferias';}).length;
   document.getElementById('folgas-metricas').innerHTML=
     '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Total registros</div><div style="font-size:22px;font-weight:700;color:#f1f5f9;">'+lista.length+'</div></div>'+
     '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Total dias</div><div style="font-size:22px;font-weight:700;color:#f1f5f9;">'+totD+'</div></div>'+
-    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Atestados</div><div style="font-size:22px;font-weight:700;color:#93c5fd;">'+qtAt+'</div></div>'+
-    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Faltas</div><div style="font-size:22px;font-weight:700;color:#f87171;">'+qtF+'</div></div>';
+    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🌴 Folgas</div><div style="font-size:22px;font-weight:700;color:#4ade80;">'+qtFg+'</div></div>'+
+    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🏥 Atestados</div><div style="font-size:22px;font-weight:700;color:#93c5fd;">'+qtAt+'</div></div>'+
+    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">❌ Faltas</div><div style="font-size:22px;font-weight:700;color:#f87171;">'+qtF+'</div></div>'+
+    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🏖️ Férias</div><div style="font-size:22px;font-weight:700;color:#c4b5fd;">'+qtFe+'</div></div>'+
+    '<div class="folgas-metrica"><div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">⚖️ Compensação</div><div style="font-size:22px;font-weight:700;color:#5eead4;">'+qtC+'</div></div>';
   tbody.innerHTML='';
   if(!lista.length){vazio.style.display='block';document.getElementById('folgas-chart').innerHTML='';return;}
   vazio.style.display='none';
