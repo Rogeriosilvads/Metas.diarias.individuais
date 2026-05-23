@@ -50,10 +50,11 @@
     .metrica-card { background: rgba(8,28,28,0.55); border-radius: 12px; padding: 14px 16px; border: 1px solid rgba(249,115,22,0.1); }
     .metrica-label { color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
     .metrica-valor { font-size: 15px; font-weight: 700; color: #f1f5f9; }
-    .ftype-folga    { background:rgba(34,197,94,0.15);  color:#4ade80;  border:1px solid rgba(34,197,94,0.3); }
-    .ftype-atestado { background:rgba(59,130,246,0.15); color:#93c5fd;  border:1px solid rgba(59,130,246,0.3); }
-    .ftype-falta-j  { background:rgba(245,158,11,0.15); color:#fbbf24;  border:1px solid rgba(245,158,11,0.3); }
-    .ftype-falta-i  { background:rgba(239,68,68,0.15);  color:#f87171;  border:1px solid rgba(239,68,68,0.3); }
+    .ftype-folga    { background:rgba(34,197,94,0.15);   color:#4ade80;  border:1px solid rgba(34,197,94,0.3); }
+    .ftype-atestado { background:rgba(59,130,246,0.15);  color:#93c5fd;  border:1px solid rgba(59,130,246,0.3); }
+    .ftype-falta-j  { background:rgba(245,158,11,0.15);  color:#fbbf24;  border:1px solid rgba(245,158,11,0.3); }
+    .ftype-falta-i  { background:rgba(239,68,68,0.15);   color:#f87171;  border:1px solid rgba(239,68,68,0.3); }
+    .ftype-ferias   { background:rgba(139,92,246,0.15);  color:#c4b5fd;  border:1px solid rgba(139,92,246,0.3); }
     .ftype-badge    { display:inline-block;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;white-space:nowrap; }
     .folgas-metrica { background:rgba(8,28,28,0.55);border-radius:12px;padding:14px 16px;border:1px solid rgba(249,115,22,0.1);flex:1;min-width:100px; }
     .folgas-row:hover td { background:rgba(249,115,22,0.04); }
@@ -323,6 +324,7 @@
             <option value="atestado">🏥 Atestado</option>
             <option value="falta-j">⚠️ Falta just.</option>
             <option value="falta-i">❌ Falta injust.</option>
+            <option value="ferias">🏖️ Férias</option>
           </select>
         </div>
       </div>
@@ -348,9 +350,15 @@
 // Planilha de colaboradores (metas por mês)
 var SHEET_ID = "1Yo0XzvABnPN8LcwmF4yCtmI2Ci3DWCwvGC2BcLKlxI8";
 var SHEET_MESES = [
-  {label:'Maio 2026',   gid:'0',          gidVendas:'0'},
-  {label:'Junho 2026',  gid:'1863138000', gidVendas:'279006968'}
-];
+  {label:"Maio 2026",     gid:"0",          gidVendas:"0"},
+  {label:"Junho 2026",    gid:"1863138000", gidVendas:"279006968"},
+  {label:"Julho 2026",    gid:"",           gidVendas:""},
+  {label:"Agosto 2026",   gid:"",           gidVendas:""},
+  {label:"Setembro 2026", gid:"",           gidVendas:""},
+  {label:"Outubro 2026",  gid:"",           gidVendas:""},
+  {label:"Novembro 2026", gid:"",           gidVendas:""},
+  {label:"Dezembro 2026", gid:"",           gidVendas:""},
+].filter(function(m){ return m.gid !== ""; });
 var _m = new Date().getMonth(), _a = new Date().getFullYear();
 var _nms = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 var _me = SHEET_MESES.find(function(x){ return x.label.toLowerCase().indexOf(_a.toString()) !== -1 && x.label.toLowerCase().indexOf(_nms[_m]) !== -1; });
@@ -358,7 +366,7 @@ var SHEET_GID_MAIN = _me ? _me.gid : SHEET_MESES[SHEET_MESES.length-1].gid;
 var mesSelecionado = SHEET_GID_MAIN;
 // Planilha de vendas diárias + ausências
 var SHEET_ID_VENDAS = "1mR6B6qDTf5lhaOfBs8PY8KwcPc23LwpYH5UM0CoE3NU";
-var SHEET_GID_DAILY = _me ? _me.gidVendas : SHEET_MESES[SHEET_MESES.length-1].gidVendas;
+var SHEET_GID_DAILY = (_me && _me.gidVendas) ? _me.gidVendas : (SHEET_MESES[SHEET_MESES.length-1].gidVendas || '0');
 
 function csvUrl(gid){ return 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:csv&gid='+gid; }
 function csvUrlMes(){ return csvUrl(mesSelecionado); }
@@ -689,8 +697,16 @@ function isoDeTexto(s){
 }
 function diffDias(ini,fim){var a=new Date(ini+'T00:00:00'),b=new Date(fim+'T00:00:00');var d=Math.round((b-a)/86400000)+1;return d<1?1:d;}
 function normTipo(v){
-  var m={'folga':'folga','atestado':'atestado','falta-j':'falta-j','falta justificada':'falta-j','falta-i':'falta-i','falta injustificada':'falta-i','ferias':'ferias','férias':'ferias'};
-  return m[(v||'').toLowerCase().trim()]||'falta-i';
+  var s = (v||'').toLowerCase().trim()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,''); // remove acentos para comparação
+  var m = {
+    'folga':'folga', 'folga programada':'folga', 'day off':'folga',
+    'atestado':'atestado', 'atestado medico':'atestado', 'medico':'atestado', 'medica':'atestado', 'cid':'atestado',
+    'falta-j':'falta-j', 'falta justificada':'falta-j', 'falta j':'falta-j',
+    'falta-i':'falta-i', 'falta injustificada':'falta-i', 'falta i':'falta-i', 'falta':'falta-i',
+    'ferias':'ferias', 'ferias programadas':'ferias', 'vacation':'ferias', 'recesso':'ferias'
+  };
+  return m[s] || 'falta-i';
 }
 
 async function carregarFolgasGitHub(){
@@ -825,16 +841,18 @@ function abrirPainel(){
 
 function renderAusenciasUsuario(u){
   var aus=carregarAusenciasLS(); var hoje=dataISO();
-  var minhas=aus.filter(function(a){return a.login===u.login;}).sort(function(a,b){return b.inicio.localeCompare(a.inicio);}).slice(0,3);
+  var minhas=aus.filter(function(a){return a.login===u.login;}).sort(function(a,b){return b.inicio.localeCompare(a.inicio);}).slice(0,5);
   var card=document.getElementById('painel-ausencias-card');
   if(!minhas.length){card.classList.add('hidden');return;}
   card.classList.remove('hidden');
-  var TN={'folga':'🌴 Folga','atestado':'🏥 Atestado','falta-j':'⚠️ Falta just.','falta-i':'❌ Falta injust.'};
+  var TN={'folga':'🌴 Folga','atestado':'🏥 Atestado','falta-j':'⚠️ Falta just.','falta-i':'❌ Falta injust.','ferias':'🏖️ Férias'};
+  var cores={'folga':'#4ade80','atestado':'#93c5fd','falta-j':'#fbbf24','falta-i':'#f87171','ferias':'#c4b5fd'};
   document.getElementById('painel-ausencias-lista').innerHTML=minhas.map(function(a){
     var ativo=a.inicio<=hoje&&a.fim>=hoje;
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(59,130,246,0.1);">'+
-      '<span style="color:#93c5fd;font-size:12px;">'+(TN[a.tipo]||a.tipo)+' — '+fmtBR(a.inicio)+(a.inicio!==a.fim?' a '+fmtBR(a.fim):'')+' ('+a.dias+'d)</span>'+
-      (ativo?'<span style="background:rgba(245,158,11,0.2);color:#fbbf24;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;">Hoje</span>':'')+'</div>';
+    var cor=cores[a.tipo]||'#93c5fd';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(59,130,246,0.1);">'+
+      '<span style="color:'+cor+';font-size:12px;font-weight:'+(ativo?'700':'400')+';">'+(TN[a.tipo]||a.tipo)+' — '+fmtBR(a.inicio)+(a.inicio!==a.fim?' a '+fmtBR(a.fim):'')+' <span style="color:#64748b;">('+a.dias+'d)</span></span>'+
+      (ativo?'<span style="background:rgba(245,158,11,0.2);color:#fbbf24;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;white-space:nowrap;margin-left:8px;">Hoje</span>':'')+'</div>';
   }).join('');
 }
 
@@ -1149,7 +1167,13 @@ var LS_KEY = 'farm-ausencias';
 var ausencias = [];
 function carregarAusenciasLS(){ try{ausencias=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){ausencias=[];} return ausencias; }
 function salvarAusenciasLS(){ localStorage.setItem(LS_KEY,JSON.stringify(ausencias)); }
-var FTIPOS = {'folga':{label:'🌴 Folga',cls:'ftype-folga'},'atestado':{label:'🏥 Atestado',cls:'ftype-atestado'},'falta-j':{label:'⚠️ Falta just.',cls:'ftype-falta-j'},'falta-i':{label:'❌ Falta injust.',cls:'ftype-falta-i'}};
+var FTIPOS = {
+  'folga':    {label:'🌴 Folga',        cls:'ftype-folga'},
+  'atestado': {label:'🏥 Atestado',     cls:'ftype-atestado'},
+  'falta-j':  {label:'⚠️ Falta just.',  cls:'ftype-falta-j'},
+  'falta-i':  {label:'❌ Falta injust.', cls:'ftype-falta-i'},
+  'ferias':   {label:'🏖️ Férias',       cls:'ftype-ferias'}
+};
 var MNOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 function preencherFiltrosFolgas(){
