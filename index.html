@@ -104,12 +104,17 @@
 <!-- PAINEL USUÁRIO -->
 <div id="tela-painel" class="tela hidden">
   <div style="width:100%;max-width:460px;">
+    <!-- Banner admin visitando painel -->
+    <div id="admin-painel-banner" style="display:none;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);border-radius:12px;padding:10px 16px;margin-bottom:16px;display:none;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="color:#93c5fd;font-size:12px;font-weight:700;">👁️ Visão Admin — <span id="admin-banner-nome"></span></span>
+      <button onclick="voltarAdmin()" style="background:rgba(59,130,246,0.25);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Georgia,serif;">← Voltar ao Admin</button>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
       <div>
         <p id="painel-data" style="color:#64748b;font-size:12px;margin:0 0 2px;text-transform:uppercase;letter-spacing:1px;"></p>
         <h2 style="color:#f1f5f9;font-size:18px;margin:0;font-weight:700;">Sua Meta Diária</h2>
       </div>
-      <button class="btn-sec" onclick="sair()">Sair</button>
+      <button id="painel-btn-sair" class="btn-sec" onclick="sair()">Sair</button>
     </div>
     <div class="card" style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">
@@ -831,7 +836,25 @@ function barraSt(u){
 // ── NAV ──────────────────────────────────────
 function mostrar(id){ ['tela-login','tela-painel','tela-admin'].forEach(function(t){ var el=document.getElementById(t); if(t===id) el.classList.remove('hidden'); else el.classList.add('hidden'); }); }
 function irLogin(){ usuarioLogado=null; document.getElementById('inp-login').value=''; document.getElementById('inp-senha').value=''; setErro(''); mostrar('tela-login'); }
-function sair(){ var ci=document.getElementById('calc-input'); if(ci) ci.value=''; var cr=document.getElementById('calc-resultado'); if(cr) cr.style.display='none'; irLogin(); }
+function sair(){
+  var ci=document.getElementById('calc-input'); if(ci) ci.value='';
+  var cr=document.getElementById('calc-resultado'); if(cr) cr.style.display='none';
+  window._adminPainelAtivo=false; window._adminModo=false;
+  irLogin();
+}
+function voltarAdmin(){
+  // Volta ao painel admin sem fazer logout
+  var ci=document.getElementById('calc-input'); if(ci) ci.value='';
+  var cr=document.getElementById('calc-resultado'); if(cr) cr.style.display='none';
+  var banner=document.getElementById('admin-painel-banner');
+  if(banner) banner.style.display='none';
+  var btnSair=document.getElementById('painel-btn-sair');
+  if(btnSair) btnSair.style.display='';
+  usuarioLogado=window._adminUsuarioReal;
+  window._adminPainelAtivo=false; window._adminModo=false;
+  window._adminUsuarioReal=undefined;
+  abrirAdmin();
+}
 
 // ── LOGIN ────────────────────────────────────
 function setErro(msg){ var el=document.getElementById('erro-login'); if(msg){el.textContent='⚠️ '+msg;el.classList.remove('hidden');}else el.classList.add('hidden'); }
@@ -853,6 +876,17 @@ document.getElementById('inp-admin-senha').addEventListener('keydown',function(e
 // ── PAINEL USUÁRIO ───────────────────────────
 function abrirPainel(){
   var u=usuarioLogado; var st=getStatus(u.metaDiaria);
+  // Mostra banner de admin se estiver visitando como admin
+  var banner=document.getElementById('admin-painel-banner');
+  var btnSair=document.getElementById('painel-btn-sair');
+  if(window._adminPainelAtivo){
+    banner.style.display='flex';
+    document.getElementById('admin-banner-nome').textContent=u.nome.split(' ')[0];
+    if(btnSair) btnSair.style.display='none';
+  } else {
+    banner.style.display='none';
+    if(btnSair) btnSair.style.display='';
+  }
   document.getElementById('painel-data').textContent=hojeStr()+'  •  '+labelMes();
   document.getElementById('painel-nome').textContent=u.nome;
   document.getElementById('painel-avatar').textContent=initials(u.nome);
@@ -1116,13 +1150,25 @@ function renderTabela(){
       '<td style="font-weight:800;color:'+st.color+';">'+brl(u.metaDiaria)+'</td>'+
       '<td>'+barraSt(u)+'</td>'+
       '<td style="display:flex;gap:6px;align-items:center;">'+
-        '<button onclick="verPerfAdmin('+i+')" style="background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.4);color:#4ade80;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">📊</button>'+
-        '<button onclick="editarSenha('+i+')" style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#fed7aa;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🔑</button>'+
+        '<button onclick="verPainelAdmin('+i+')" style="background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;" title="Ver painel completo">👁️</button>'+
+        '<button onclick="verPerfAdmin('+i+')" style="background:rgba(34,197,94,0.18);border:1px solid rgba(34,197,94,0.4);color:#4ade80;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;" title="Ver calendário">📊</button>'+
+        '<button onclick="editarSenha('+i+')" style="background:rgba(249,115,22,0.15);border:1px solid rgba(249,115,22,0.35);color:#fed7aa;padding:5px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;" title="Editar senha">🔑</button>'+
       '</td>';
     tbody.appendChild(tr);
   }
 }
 function verPerfAdmin(i){ window._adminModo=true; window._adminUsuarioReal=usuarioLogado; usuarioLogado=usuarios[i]; abrirGrafico(); }
+
+function verPainelAdmin(i){
+  // Abre o painel completo do colaborador como se fosse ele logado
+  window._adminModo=true;
+  window._adminUsuarioReal=usuarioLogado;
+  usuarioLogado=usuarios[i];
+  // Marca que veio do admin para mostrar botão de voltar
+  window._adminPainelAtivo=true;
+  abrirPainel();
+}
+
 function editarSenha(i){ var u=usuarios[i]; var nova=prompt('Nova senha para '+u.nome.split(/\s+/)[0]+' (atual: '+senhaEf(u)+'):',u.senha||''); if(nova===null) return; usuarios[i].senha=nova.trim(); renderTabela(); }
 
 // ── UPLOAD COLABORADORES ──────────────────────
