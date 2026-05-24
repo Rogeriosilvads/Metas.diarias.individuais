@@ -108,7 +108,7 @@
 <div id="tela-painel" class="tela hidden">
   <div style="width:100%;max-width:460px;">
     <!-- Banner admin visitando painel -->
-    <div id="admin-painel-banner" style="display:none;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);border-radius:12px;padding:10px 16px;margin-bottom:16px;display:none;align-items:center;justify-content:space-between;gap:12px;">
+    <div id="admin-painel-banner" style="display:none;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);border-radius:12px;padding:10px 16px;margin-bottom:16px;align-items:center;justify-content:space-between;gap:12px;">
       <span style="color:#93c5fd;font-size:12px;font-weight:700;">👁️ Visão Admin — <span id="admin-banner-nome"></span></span>
       <button onclick="voltarAdmin()" style="background:rgba(59,130,246,0.25);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Georgia,serif;">← Voltar ao Admin</button>
     </div>
@@ -322,7 +322,7 @@
     </div>
     <div id="admin-folgas-section" style="background:rgba(10,32,32,0.85);border:1px solid rgba(59,130,246,0.25);border-radius:20px;overflow:hidden;margin-bottom:24px;">
       <div style="padding:20px 24px;border-bottom:1px solid rgba(59,130,246,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <div><h3 style="color:#f1f5f9;margin:0;font-size:15px;font-weight:700;">📅 Folgas e Atestados</h3><p style="color:#64748b;font-size:12px;margin:4px 0 0;">Controle de ausências da equipe</p></div>
+        <div><h3 style="color:#f1f5f9;margin:0;font-size:15px;font-weight:700;">📅 Folgas e Atestados</h3><p style="color:#64748b;font-size:12px;margin:4px 0 0;">Controle de ausências da equipe — <span id="folgas-sync-label" style="color:#34d399;"></span></p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="folgas-filtro-mes" onchange="renderFolgas()" style="background:rgba(8,28,28,0.65);border:1px solid rgba(59,130,246,0.3);border-radius:8px;color:#f1f5f9;padding:6px 10px;font-size:12px;font-family:Georgia,serif;"></select>
           <select id="folgas-filtro-pessoa" onchange="renderFolgas()" style="background:rgba(8,28,28,0.65);border:1px solid rgba(59,130,246,0.3);border-radius:8px;color:#f1f5f9;padding:6px 10px;font-size:12px;font-family:Georgia,serif;"></select>
@@ -349,7 +349,7 @@
       <div id="folgas-chart" style="padding:16px;border-top:1px solid rgba(59,130,246,0.1);"></div>
     </div>
     <div style="padding:14px 16px;background:rgba(249,115,22,0.08);border-radius:10px;border:1px solid rgba(249,115,22,0.2);">
-      <p style="color:#94a3b8;font-size:12px;margin:0;">🔐 <strong style="color:#fed7aa;">Senha individual:</strong> clique em 🔑 para definir por usuário.<br>📊 Planilha: <strong style="color:#fed7aa;">Colaborador | Saldo | Venda | Falta | Meta Diária | Login | Senha | MetaQtd | MetaTicket</strong></p>
+      <p style="color:#94a3b8;font-size:12px;margin:0;">📊 Formato da planilha de colaboradores: <strong style="color:#fed7aa;">Colaborador | Saldo | Venda | Falta | Meta Diária | Login | Senha | MetaQtd | MetaTicket</strong><br>📅 Ausências: coluna Tipo aceita <strong style="color:#fed7aa;">folga | atestado | falta-j | falta-i | ferias | compensacao</strong></p>
     </div>
   </div>
 </div>
@@ -608,7 +608,7 @@ function carregarFallback(){
     {nome:"FELIPE PEREIRA AMARAL",         login:"felipe",     senha:"9463", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"GESSICA DOS SANTOS ARAUJO",     login:"gessica",    senha:"3718", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IASMIN DOS SANTOS",             login:"iasmin",     senha:"5290", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
-    {nome:"IGOR",                          login:"igor",       senha:"2328", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
+    {nome:"IGOR",                          login:"igor",       senha:"1234", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IRACI SANTANA SANTOS",          login:"iraci",      senha:"8641", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"LUCAS PINA DOS SANTOS",         login:"lucas",      senha:"1075", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"MARIA ANA DE JESUS DOS SANTOS", login:"maria",      senha:"4823", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
@@ -788,7 +788,9 @@ async function carregarFolgasGitHub(){
     ausencias = ausencias.concat(validos);
     salvarAusenciasLS();
     console.log('[Ausencias] Sincronizadas:', validos.length);
-    mostrarToast('✅ '+validos.length+' ausências sincronizadas','#34d399');
+    var agora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    localStorage.setItem('farm-ausencias-sync', agora);
+    mostrarToast('✅ '+validos.length+' ausências sincronizadas às '+agora,'#34d399');
   } catch(e){ console.warn('[Ausencias] Erro ao carregar:', e.message); }
 }
 
@@ -923,6 +925,38 @@ function abrirPainel(){
     document.getElementById('card-atendimentos').classList.remove('hidden');
   } else document.getElementById('card-atendimentos').classList.add('hidden');
   renderAusenciasUsuario(u);
+  mostrarAvisoAusenciaHoje(u);
+}
+
+function mostrarAvisoAusenciaHoje(u){
+  var hoje = dataISO();
+  var aus = carregarAusenciasLS();
+  var ativa = aus.find(function(a){
+    return a.login === u.login && a.inicio <= hoje && a.fim >= hoje;
+  });
+  // Remove aviso anterior se existir
+  var anterior = document.getElementById('aviso-ausencia-hoje');
+  if(anterior) anterior.remove();
+  if(!ativa) return;
+  var icons = {'folga':'🌴','atestado':'🏥','falta-j':'⚠️','falta-i':'❌','ferias':'🏖️','compensacao':'⚖️'};
+  var labels = {'folga':'Folga','atestado':'Atestado','falta-j':'Falta justificada','falta-i':'Falta injustificada','ferias':'Férias','compensacao':'Compensação'};
+  var cores = {'folga':'34,197,94','atestado':'59,130,246','falta-j':'245,158,11','falta-i':'239,68,68','ferias':'139,92,246','compensacao':'20,184,166'};
+  var cor = cores[ativa.tipo] || '249,115,22';
+  var ic = icons[ativa.tipo] || '📅';
+  var lb = labels[ativa.tipo] || ativa.tipo;
+  var aviso = document.createElement('div');
+  aviso.id = 'aviso-ausencia-hoje';
+  aviso.style.cssText = 'background:rgba('+cor+',0.1);border:1px solid rgba('+cor+',0.35);border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;';
+  aviso.innerHTML = '<span style="font-size:28px;">'+ic+'</span>'+
+    '<div><div style="color:rgba('+cor+',1);font-size:13px;font-weight:800;margin-bottom:2px;">'+lb+' hoje</div>'+
+    '<div style="color:#94a3b8;font-size:11px;">'+
+      (ativa.motivo ? ativa.motivo+' • ' : '')+
+      fmtBR(ativa.inicio)+(ativa.inicio!==ativa.fim?' até '+fmtBR(ativa.fim):'')+
+      ' ('+ativa.dias+(ativa.dias===1?' dia':' dias')+')'+
+    '</div></div>';
+  // Insere antes do card principal
+  var card = document.querySelector('#tela-painel .card');
+  if(card) card.parentNode.insertBefore(aviso, card);
 }
 
 function renderAusenciasUsuario(u){
@@ -1007,7 +1041,21 @@ function abrirGrafico(){
   document.getElementById('modal-grafico').style.display='block';
   document.body.style.overflow='hidden';
 }
-function calNavegar(delta){ if(!window._calState)return; window._calState.mes+=delta; if(window._calState.mes>11){window._calState.mes=0;window._calState.ano++;} if(window._calState.mes<0){window._calState.mes=11;window._calState.ano--;} renderCalendario(); }
+function calNavegar(delta){
+  if(!window._calState) return;
+  window._calState.mes+=delta;
+  if(window._calState.mes>11){window._calState.mes=0;window._calState.ano++;}
+  if(window._calState.mes<0){window._calState.mes=11;window._calState.ano--;}
+  renderCalendario();
+  // Avisa se mês não tem dados
+  var mes=window._calState.mes; var ano=window._calState.ano;
+  var mm=String(mes+1).padStart(2,'0');
+  var temDados=Object.keys(window._calState.mapa).some(function(k){return k.indexOf('/'+mm)!==-1;});
+  var titulo=document.getElementById('cal-titulo');
+  if(!temDados && titulo){
+    titulo.innerHTML=titulo.textContent+' <span style="font-size:10px;color:#64748b;font-weight:400;">(sem dados)</span>';
+  }
+}
 function renderCalendario(){
   var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa; var meta=st.meta;
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -1105,6 +1153,9 @@ async function abrirAdmin(){
   await carregarVendasDiarias();
   document.getElementById('admin-contagem').textContent=usuarios.length+' usuários — '+labelMes();
   renderTabela(); renderRankingAt(); preencherFiltrosFolgas(); renderFolgas();
+  var syncHora = localStorage.getItem('farm-ausencias-sync');
+  var syncLabel = document.getElementById('folgas-sync-label');
+  if(syncLabel) syncLabel.textContent = syncHora ? '✅ Sincronizado às '+syncHora : '⏳ Aguardando sincronização';
   mostrar('tela-admin');
 }
 function preencherSeletorMeses(){
