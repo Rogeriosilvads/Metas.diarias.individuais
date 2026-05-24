@@ -415,6 +415,49 @@
       </div>
       <div id="folgas-chart" style="padding:16px;border-top:1px solid rgba(59,130,246,0.1);"></div>
     </div>
+    <!-- ANÁLISE DE DESEMPENHO -->
+    <div id="admin-desempenho-section" style="background:rgba(10,32,32,0.85);border:1px solid rgba(249,115,22,0.25);border-radius:20px;overflow:hidden;margin-bottom:24px;">
+      <div style="padding:20px 24px;border-bottom:1px solid rgba(249,115,22,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h3 style="color:#f1f5f9;margin:0;font-size:15px;font-weight:700;">📈 Análise de Desempenho</h3>
+          <p style="color:#64748b;font-size:12px;margin:4px 0 0;">Evolução mensal e comparação entre períodos</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="desemp-colaborador" onchange="renderDesempenho()" style="background:rgba(8,28,28,0.65);border:1px solid rgba(249,115,22,0.3);border-radius:8px;color:#f1f5f9;padding:6px 10px;font-size:12px;font-family:Georgia,serif;"></select>
+          <div style="display:flex;gap:6px;align-items:center;background:rgba(8,28,28,0.5);border:1px solid rgba(249,115,22,0.2);border-radius:8px;padding:4px 8px;">
+            <span style="color:#64748b;font-size:11px;font-weight:600;">Comparar:</span>
+            <select id="desemp-mes-a" onchange="renderDesempenho()" style="background:transparent;border:none;color:#fed7aa;font-size:12px;font-weight:700;outline:none;font-family:Georgia,serif;cursor:pointer;"></select>
+            <span style="color:#475569;font-size:11px;">vs</span>
+            <select id="desemp-mes-b" onchange="renderDesempenho()" style="background:transparent;border:none;color:#4ade80;font-size:12px;font-weight:700;outline:none;font-family:Georgia,serif;cursor:pointer;"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards de comparação -->
+      <div id="desemp-comparacao" style="padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;"></div>
+
+      <!-- Gráfico anual de barras -->
+      <div style="padding:0 16px 16px;">
+        <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-weight:600;">📊 Evolução Anual — Venda Diária Média</div>
+        <div id="desemp-grafico-anual" style="display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px;"></div>
+        <div id="desemp-grafico-labels" style="display:flex;gap:4px;margin-top:6px;"></div>
+      </div>
+
+      <!-- Diagnóstico -->
+      <div id="desemp-diagnostico" style="margin:0 16px 16px;background:rgba(8,28,28,0.55);border-radius:12px;padding:14px 16px;border:1px solid rgba(249,115,22,0.1);"></div>
+
+      <!-- Tabela detalhada por mês -->
+      <div style="overflow-x:auto;border-top:1px solid rgba(249,115,22,0.1);">
+        <table>
+          <thead><tr>
+            <th>Mês</th><th>Venda Total</th><th>Meta</th><th>% Meta</th>
+            <th>Atendimentos</th><th>Ticket Médio</th><th>Dias Trabalhados</th><th>Dias Bons</th>
+          </tr></thead>
+          <tbody id="desemp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div style="padding:14px 16px;background:rgba(249,115,22,0.08);border-radius:10px;border:1px solid rgba(249,115,22,0.2);">
       <p style="color:#94a3b8;font-size:12px;margin:0;">📊 Formato da planilha de colaboradores: <strong style="color:#fed7aa;">Colaborador | Saldo | Venda | Falta | Meta Diária | Login | Senha | MetaQtd | MetaTicket</strong><br>📅 Ausências: coluna Tipo aceita <strong style="color:#fed7aa;">folga | atestado | falta-j | falta-i | ferias | compensacao</strong></p>
     </div>
@@ -1235,6 +1278,7 @@ async function abrirAdmin(){
   var syncHora = localStorage.getItem('farm-ausencias-sync');
   var syncLabel = document.getElementById('folgas-sync-label');
   if(syncLabel) syncLabel.textContent = syncHora ? '✅ Sincronizado às '+syncHora : '⏳ Aguardando sincronização';
+  carregarHistorico(); salvarHistoricoMes(); preencherSeletoresDesempenho(); renderDesempenho();
   mostrar('tela-admin');
 }
 function preencherSeletorMeses(){
@@ -1250,6 +1294,7 @@ async function trocarMes(gid){
   await carregarDadosGSheets(); await carregarVendasDiarias();
   document.getElementById('admin-contagem').textContent=usuarios.length+' usuários — '+labelMes();
   renderTabela(); renderRankingAt(); preencherFiltrosFolgas(); renderFolgas();
+  salvarHistoricoMes(); preencherSeletoresDesempenho(); renderDesempenho();
 }
 function renderRankingAt(){
   var dados=[];
@@ -1473,6 +1518,255 @@ function renderFolgas(){
 }
 
 function excluirFolga(id){ if(!confirm('Excluir este registro?')) return; carregarAusenciasLS(); ausencias=ausencias.filter(function(a){return a.id!==id;}); salvarAusenciasLS(); renderFolgas(); }
+
+// ══════════════════════════════════════════════════════════
+// 📈 ANÁLISE DE DESEMPENHO
+// ══════════════════════════════════════════════════════════
+
+// Dados históricos de vendas por mês — estrutura:
+// historicoVendas[login][label_mes] = [{data, valor, qtd, semVenda}]
+var historicoVendas = {};
+
+function salvarHistoricoMes(){
+  // Salva os dados do mês atual no histórico
+  var label = labelMes();
+  usuarios.forEach(function(u){
+    if(!historicoVendas[u.login]) historicoVendas[u.login] = {};
+    var dias = vendasDiarias[u.login] || [];
+    if(dias.length > 0){
+      historicoVendas[u.login][label] = {
+        dias: dias,
+        metaDiaria: u.metaDiaria,
+        saldoMetas: u.saldoMetas,
+        venda: u.venda,
+        falta: u.falta
+      };
+    }
+  });
+  // Persiste no localStorage
+  try{ localStorage.setItem('farm-historico', JSON.stringify(historicoVendas)); }catch(e){}
+}
+
+function carregarHistorico(){
+  try{
+    var raw = localStorage.getItem('farm-historico');
+    if(raw) historicoVendas = JSON.parse(raw);
+  }catch(e){ historicoVendas = {}; }
+}
+
+function getMesesDisponiveis(){
+  // Une meses da planilha configurados + meses no histórico
+  var meses = {};
+  SHEET_MESES.forEach(function(m){ meses[m.label] = true; });
+  Object.keys(historicoVendas).forEach(function(login){
+    Object.keys(historicoVendas[login]).forEach(function(lb){ meses[lb] = true; });
+  });
+  return Object.keys(meses);
+}
+
+function getDadosMes(login, labelM){
+  // Primeiro tenta do histórico
+  if(historicoVendas[login] && historicoVendas[login][labelM]){
+    return historicoVendas[login][labelM];
+  }
+  // Se é o mês atual carregado, usa vendasDiarias
+  if(labelM === labelMes()){
+    var u = usuarios.find(function(x){ return x.login === login; });
+    return u ? {dias: vendasDiarias[login]||[], metaDiaria: u.metaDiaria, saldo: u.saldoMetas, venda: u.venda, falta: u.falta} : null;
+  }
+  return null;
+}
+
+function calcMetricasMes(dados){
+  if(!dados || !dados.dias) return null;
+  var dias = dados.dias;
+  var trabalhados = dias.filter(function(d){ return !d.semVenda; });
+  var bons = trabalhados.filter(function(d){ return d.valor >= (dados.metaDiaria||0); });
+  var totalVenda = trabalhados.reduce(function(a,d){ return a + d.valor; }, 0);
+  var totalAt = trabalhados.filter(function(d){ return d.qtd > 0; }).reduce(function(a,d){ return a + d.qtd; }, 0);
+  var diasComAt = trabalhados.filter(function(d){ return d.qtd > 0; }).length;
+  var ticket = (totalAt > 0) ? totalVenda / totalAt : 0;
+  var metaTotal = (dados.metaDiaria||0) * trabalhados.length;
+  var pctMeta = metaTotal > 0 ? Math.round((totalVenda / metaTotal) * 100) : 0;
+  return {
+    totalVenda: totalVenda,
+    trabalhados: trabalhados.length,
+    bons: bons.length,
+    totalAt: totalAt,
+    diasComAt: diasComAt,
+    ticket: ticket,
+    metaDiaria: dados.metaDiaria || 0,
+    metaTotal: metaTotal,
+    pctMeta: pctMeta,
+    mediaDiaria: trabalhados.length > 0 ? totalVenda / trabalhados.length : 0,
+    mediaAt: diasComAt > 0 ? totalAt / diasComAt : 0
+  };
+}
+
+function preencherSeletoresDesempenho(){
+  var meses = getMesesDisponiveis();
+  var selA = document.getElementById('desemp-mes-a');
+  var selB = document.getElementById('desemp-mes-b');
+  var selC = document.getElementById('desemp-colaborador');
+  if(!selA || !selB || !selC) return;
+
+  selA.innerHTML = ''; selB.innerHTML = '';
+  meses.forEach(function(m, i){
+    var oA = document.createElement('option'); oA.value = m; oA.textContent = m; selA.appendChild(oA);
+    var oB = document.createElement('option'); oB.value = m; oB.textContent = m; selB.appendChild(oB);
+  });
+  // Padrão: A = penúltimo, B = último
+  if(meses.length >= 2){ selA.value = meses[meses.length-2]; selB.value = meses[meses.length-1]; }
+  else if(meses.length === 1){ selA.value = meses[0]; selB.value = meses[0]; }
+
+  selC.innerHTML = '';
+  usuarios.forEach(function(u){
+    var o = document.createElement('option'); o.value = u.login; o.textContent = u.nome.split(' ')[0]; selC.appendChild(o);
+  });
+}
+
+function renderDesempenho(){
+  salvarHistoricoMes();
+  var selC = document.getElementById('desemp-colaborador');
+  var selA = document.getElementById('desemp-mes-a');
+  var selB = document.getElementById('desemp-mes-b');
+  if(!selC || !selA || !selB) return;
+
+  var login = selC.value;
+  var lblA = selA.value;
+  var lblB = selB.value;
+
+  var dadosA = getDadosMes(login, lblA);
+  var dadosB = getDadosMes(login, lblB);
+  var mA = calcMetricasMes(dadosA);
+  var mB = calcMetricasMes(dadosB);
+
+  // ── Cards de comparação ──
+  var comp = document.getElementById('desemp-comparacao');
+  if(!comp) return;
+
+  function cardComp(titulo, valA, valB, fmt, inverso){
+    var sameMonth = lblA === lblB;
+    var diff = valB - valA;
+    var pct = valA > 0 ? Math.round((diff/valA)*100) : 0;
+    var up = inverso ? diff < 0 : diff > 0;
+    var cor = sameMonth ? '#94a3b8' : (diff === 0 ? '#94a3b8' : (up ? '#4ade80' : '#f87171'));
+    var seta = sameMonth ? '' : (diff > 0 ? ' ↑' : diff < 0 ? ' ↓' : ' →');
+    var pctTxt = sameMonth ? '' : (diff !== 0 ? ' ('+Math.abs(pct)+'%)' : '');
+    return '<div style="background:rgba(8,28,28,0.55);border-radius:12px;padding:14px;border:1px solid rgba(249,115,22,0.1);">' +
+      '<div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">' + titulo + '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px;">' +
+        '<span style="color:#fed7aa;font-size:11px;font-weight:700;">' + lblA.split(' ')[0] + '</span>' +
+        '<span style="color:#fed7aa;font-size:13px;font-weight:800;">' + fmt(valA) + '</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">' +
+        '<span style="color:#4ade80;font-size:11px;font-weight:700;">' + lblB.split(' ')[0] + '</span>' +
+        '<span style="color:#4ade80;font-size:13px;font-weight:800;">' + fmt(valB) + '</span>' +
+      '</div>' +
+      '<div style="padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">' +
+        '<span style="color:' + cor + ';font-size:13px;font-weight:800;">' + seta + pctTxt + (sameMonth ? '— mesmo mês' : (diff === 0 ? '→ sem variação' : '')) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var vA = mA ? mA.totalVenda : 0;
+  var vB = mB ? mB.totalVenda : 0;
+  var tA = mA ? mA.ticket : 0;
+  var tB = mB ? mB.ticket : 0;
+  var aA = mA ? mA.mediaAt : 0;
+  var aB = mB ? mB.mediaAt : 0;
+  var pA = mA ? mA.pctMeta : 0;
+  var pB = mB ? mB.pctMeta : 0;
+
+  comp.innerHTML =
+    cardComp('💰 Venda Total', vA, vB, brl, false) +
+    cardComp('🎫 Ticket Médio', tA, tB, brl, false) +
+    cardComp('👥 Média Atend./Dia', aA, aB, function(v){ return v.toFixed(1); }, false) +
+    cardComp('🎯 % da Meta', pA, pB, function(v){ return v+'%'; }, false);
+
+  // ── Diagnóstico inteligente ──
+  var diag = document.getElementById('desemp-diagnostico');
+  if(diag && mB){
+    var msgs = [];
+    // Vendas vs atendimentos
+    if(mB.ticket > (mA ? mA.ticket : 0) && mB.mediaAt < (mA ? mA.mediaAt : mB.mediaAt)){
+      msgs.push('📦 <strong style="color:#fbbf24;">Ticket subiu mas atendimentos caíram</strong> — o colaborador está agregando mais por venda, porém atendendo menos clientes. Foco: manter o ticket e aumentar o fluxo.');
+    } else if(mB.ticket < (mA ? mA.ticket : 0) && mB.mediaAt > (mA ? mA.mediaAt : mB.mediaAt)){
+      msgs.push('👥 <strong style="color:#60a5fa;">Atendimentos subiram mas ticket caiu</strong> — está atendendo mais gente, mas vendendo menos por cliente. Foco: oferecer complementos e produtos de maior valor.');
+    } else if(mB.totalVenda > (mA ? mA.totalVenda : 0) && mB.pctMeta > (mA ? mA.pctMeta : 0)){
+      msgs.push('🏆 <strong style="color:#4ade80;">Evolução em ambos os indicadores</strong> — mais vendas e melhor aproveitamento. Excelente mês!');
+    } else if(mB.totalVenda < (mA ? mA.totalVenda : 0)){
+      msgs.push('⚠️ <strong style="color:#f87171;">Queda nas vendas</strong> — verifique se foi por menos dias trabalhados, menos atendimentos ou queda no ticket médio.');
+    }
+    if(mB.ticket > 0 && mB.mediaAt > 0){
+      var projecao = mB.ticket * mB.mediaAt * mB.trabalhados;
+      msgs.push('📐 <strong style="color:#c4b5fd;">Projeção</strong>: mantendo o ticket de ' + brl(mB.ticket) + ' e ' + mB.mediaAt.toFixed(1) + ' atend./dia, a venda mensal seria ' + brl(projecao) + '.');
+    }
+    if(!msgs.length) msgs.push('<span style="color:#64748b;">Selecione dois meses diferentes para ver o diagnóstico comparativo.</span>');
+    diag.innerHTML = '<div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-weight:600;">🔍 Diagnóstico</div>' +
+      msgs.map(function(m){ return '<div style="color:#e2e8f0;font-size:12px;line-height:1.7;margin-bottom:6px;padding:8px 12px;background:rgba(249,115,22,0.06);border-radius:8px;border-left:3px solid rgba(249,115,22,0.3);">'+m+'</div>'; }).join('');
+  }
+
+  // ── Gráfico anual ──
+  var meses = getMesesDisponiveis();
+  var graf = document.getElementById('desemp-grafico-anual');
+  var labs = document.getElementById('desemp-grafico-labels');
+  if(!graf) return;
+
+  var dadosMeses = meses.map(function(m){
+    var d = getDadosMes(login, m);
+    var mt = calcMetricasMes(d);
+    return {label: m, media: mt ? mt.mediaDiaria : 0, pct: mt ? mt.pctMeta : 0};
+  });
+
+  var maxMedia = Math.max.apply(null, dadosMeses.map(function(d){ return d.media; })) || 1;
+  var barW = Math.max(28, Math.floor(560 / Math.max(dadosMeses.length,1)));
+
+  graf.innerHTML = dadosMeses.map(function(d){
+    var h = Math.round((d.media / maxMedia) * 100);
+    var cor = d.pct >= 100 ? 'linear-gradient(180deg,#22c55e,#16a34a)' :
+              d.pct >= 80  ? 'linear-gradient(180deg,#f97316,#ea580c)' :
+              d.pct >= 50  ? 'linear-gradient(180deg,#fbbf24,#f59e0b)' :
+                             'linear-gradient(180deg,#f87171,#ef4444)';
+    var isA = d.label === lblA, isB = d.label === lblB;
+    var border = isB ? '2px solid #4ade80' : isA ? '2px solid #fed7aa' : 'none';
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;" title="'+d.label+': '+brl(d.media)+'/dia ('+d.pct+'%)">' +
+      '<span style="color:#64748b;font-size:9px;font-weight:700;">'+d.pct+'%</span>' +
+      '<div style="width:100%;height:'+(h||4)+'px;background:'+cor+';border-radius:4px 4px 0 0;box-sizing:border-box;border:'+border+';min-height:4px;transition:height 0.3s;"></div>' +
+    '</div>';
+  }).join('');
+
+  labs.innerHTML = dadosMeses.map(function(d){
+    var isA = d.label === lblA, isB = d.label === lblB;
+    var cor = isB ? '#4ade80' : isA ? '#fed7aa' : '#475569';
+    return '<div style="flex:1;text-align:center;font-size:9px;color:'+cor+';font-weight:'+(isA||isB?'700':'400')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+d.label.split(' ')[0]+'</div>';
+  }).join('');
+
+  // ── Tabela detalhada ──
+  var tbody = document.getElementById('desemp-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '';
+  meses.forEach(function(m){
+    var d = getDadosMes(login, m);
+    var mt = calcMetricasMes(d);
+    if(!mt) return;
+    var isA = m === lblA, isB = m === lblB;
+    var bg = isB ? 'rgba(34,197,94,0.07)' : isA ? 'rgba(249,115,22,0.07)' : '';
+    var corPct = mt.pctMeta >= 100 ? '#4ade80' : mt.pctMeta >= 80 ? '#fbbf24' : '#f87171';
+    var tr = document.createElement('tr');
+    if(bg) tr.style.background = bg;
+    tr.innerHTML =
+      '<td style="font-weight:700;color:'+(isB?'#4ade80':isA?'#fed7aa':'#f1f5f9')+';white-space:nowrap;">'+m+(isA?' ◀':'')+(isB?' ◀':'')+' </td>'+
+      '<td style="color:#f1f5f9;font-weight:700;">'+brl(mt.totalVenda)+'</td>'+
+      '<td style="color:#64748b;">'+brl(mt.metaTotal)+'</td>'+
+      '<td><span style="background:'+corPct+'22;color:'+corPct+';border:1px solid '+corPct+'44;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;">'+mt.pctMeta+'%</span></td>'+
+      '<td style="color:#94a3b8;">'+mt.totalAt+'</td>'+
+      '<td style="color:#94a3b8;">'+brl(mt.ticket)+'</td>'+
+      '<td style="color:#64748b;text-align:center;">'+mt.trabalhados+'</td>'+
+      '<td style="text-align:center;"><span style="color:#4ade80;font-weight:700;">'+mt.bons+'</span><span style="color:#475569;font-size:10px;"> /'+mt.trabalhados+'</span></td>';
+    tbody.appendChild(tr);
+  });
+}
 </script>
 </body>
 </html>
