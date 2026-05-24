@@ -1555,13 +1555,25 @@ function carregarHistorico(){
 }
 
 function getMesesDisponiveis(){
-  // Une meses da planilha configurados + meses no histórico
-  var meses = {};
-  SHEET_MESES.forEach(function(m){ meses[m.label] = true; });
+  // Lista fixa com todos os meses do ano — sempre aparece completo
+  var TODOS = [
+    'Janeiro 2026','Fevereiro 2026','Março 2026','Abril 2026',
+    'Maio 2026','Junho 2026','Julho 2026','Agosto 2026',
+    'Setembro 2026','Outubro 2026','Novembro 2026','Dezembro 2026'
+  ];
+  // Adiciona meses do histórico que não estejam na lista (anos futuros etc)
   Object.keys(historicoVendas).forEach(function(login){
-    Object.keys(historicoVendas[login]).forEach(function(lb){ meses[lb] = true; });
+    Object.keys(historicoVendas[login]).forEach(function(lb){
+      if(TODOS.indexOf(lb) === -1) TODOS.push(lb);
+    });
   });
-  return Object.keys(meses);
+  return TODOS;
+}
+
+function temDadosMes(login, labelM){
+  if(historicoVendas[login] && historicoVendas[login][labelM]) return true;
+  if(labelM === labelMes()) return (vendasDiarias[login]||[]).length > 0;
+  return false;
 }
 
 function getDadosMes(login, labelM){
@@ -1610,14 +1622,39 @@ function preencherSeletoresDesempenho(){
   var selC = document.getElementById('desemp-colaborador');
   if(!selA || !selB || !selC) return;
 
+  var selCVal = selC.value; // preserva colaborador selecionado
   selA.innerHTML = ''; selB.innerHTML = '';
-  meses.forEach(function(m, i){
-    var oA = document.createElement('option'); oA.value = m; oA.textContent = m; selA.appendChild(oA);
-    var oB = document.createElement('option'); oB.value = m; oB.textContent = m; selB.appendChild(oB);
+  meses.forEach(function(m){
+    var login = selCVal || (usuarios[0] ? usuarios[0].login : '');
+    var temD = temDadosMes(login, m);
+    var label = temD ? m : m + ' —';
+    var oA = document.createElement('option');
+    oA.value = m; oA.textContent = label;
+    if(!temD) oA.style.color = '#475569';
+    selA.appendChild(oA);
+    var oB = document.createElement('option');
+    oB.value = m; oB.textContent = label;
+    if(!temD) oB.style.color = '#475569';
+    selB.appendChild(oB);
   });
-  // Padrão: A = penúltimo, B = último
-  if(meses.length >= 2){ selA.value = meses[meses.length-2]; selB.value = meses[meses.length-1]; }
-  else if(meses.length === 1){ selA.value = meses[0]; selB.value = meses[0]; }
+  // Padrão: seleciona os dois meses com dados mais recentes
+  var comDados = meses.filter(function(m){
+    var login = selCVal || (usuarios[0] ? usuarios[0].login : '');
+    return temDadosMes(login, m);
+  });
+  if(comDados.length >= 2){
+    selA.value = comDados[comDados.length-2];
+    selB.value = comDados[comDados.length-1];
+  } else if(comDados.length === 1){
+    selA.value = comDados[0]; selB.value = comDados[0];
+  } else {
+    // Sem dados ainda — seleciona pelos índices do mês atual
+    var hoje = new Date();
+    var nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    var mesAtual = nomesMes[hoje.getMonth()] + ' ' + hoje.getFullYear();
+    var mesAnterior = nomesMes[hoje.getMonth() > 0 ? hoje.getMonth()-1 : 11] + ' ' + (hoje.getMonth() > 0 ? hoje.getFullYear() : hoje.getFullYear()-1);
+    selA.value = mesAnterior; selB.value = mesAtual;
+  }
 
   selC.innerHTML = '';
   usuarios.forEach(function(u){
