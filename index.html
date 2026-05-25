@@ -938,22 +938,12 @@ function getStatus(meta){
   return{label:'Você Consegue',color:'#ef4444',bg:'rgba(239,68,68,0.12)'};
 }
 function getStDin(u){
-  var venda = u.venda || 0;
-  var falta = u.falta || 0;
-  var meta = u.saldoMetas || 0;
-  // % = venda / meta_total_do_mês (saldoMetas)
-  // Se não tiver saldoMetas, fallback para venda/(venda+falta)
-  var pct;
-  if(meta > 0){
-    pct = Math.round((venda / meta) * 100);
-  } else {
-    var total = venda + Math.max(falta, 0);
-    pct = total > 0 ? Math.round((venda / total) * 100) : 0;
-  }
-  if(falta <= 0 || pct >= 100) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
-  if(pct >= 85) return{pct:pct,label:'🔥 Falta pouco!',color:'#a3e635'};
-  if(pct >= 60) return{pct:pct,label:'⚡ Quase lá!',color:'#fbbf24'};
-  if(pct >= 30) return{pct:pct,label:'📈 No Caminho',color:'#f97316'};
+  var falta=u.falta||0;
+  if(falta<=0) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
+  var total=(u.venda||0)+falta; var pct=total>0?Math.round(((u.venda||0)/total)*100):0;
+  if(pct>=85) return{pct:pct,label:'🔥 Falta pouco!',color:'#a3e635'};
+  if(pct>=60) return{pct:pct,label:'⚡ Quase lá!',color:'#fbbf24'};
+  if(pct>=30) return{pct:pct,label:'📈 No Caminho',color:'#f97316'};
   return{pct:pct,label:'⚠️ Atenção!',color:'#f87171'};
 }
 function barraSt(u){
@@ -1547,9 +1537,9 @@ function salvarHistoricoMes(){
       historicoVendas[u.login][label] = {
         dias: dias,
         metaDiaria: u.metaDiaria,
-        saldoMetas: u.saldoMetas,  // meta total do mês (base do %)
-        venda: u.venda,            // venda realizada
-        falta: u.falta             // quanto falta
+        saldoMetas: u.saldoMetas,
+        venda: u.venda,
+        falta: u.falta
       };
     }
   });
@@ -1608,20 +1598,8 @@ function calcMetricasMes(dados){
   var totalAt = trabalhados.filter(function(d){ return d.qtd > 0; }).reduce(function(a,d){ return a + d.qtd; }, 0);
   var diasComAt = trabalhados.filter(function(d){ return d.qtd > 0; }).length;
   var ticket = (totalAt > 0) ? totalVenda / totalAt : 0;
-
-  // ✅ Usa saldoMetas (meta total do mês) como base do % — igual à tabela admin
-  // saldoMetas = venda + falta (meta total definida para o mês)
-  var metaTotal;
-  if(dados.saldoMetas && dados.saldoMetas > 0){
-    metaTotal = dados.saldoMetas; // direto da planilha
-  } else if(dados.venda !== undefined && dados.falta !== undefined){
-    metaTotal = (dados.venda || 0) + Math.max(dados.falta || 0, 0); // venda + falta
-  } else {
-    metaTotal = (dados.metaDiaria||0) * trabalhados.length; // fallback
-  }
-
+  var metaTotal = (dados.metaDiaria||0) * trabalhados.length;
   var pctMeta = metaTotal > 0 ? Math.round((totalVenda / metaTotal) * 100) : 0;
-
   return {
     totalVenda: totalVenda,
     trabalhados: trabalhados.length,
