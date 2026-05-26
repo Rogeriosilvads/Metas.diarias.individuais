@@ -680,7 +680,19 @@ async function carregarDadosGSheets(){
                   login:loginRaw.toLowerCase(), senha:senhaRaw, metaQtdDia:qtd, metaTicketMeta:ticket});
     }
 
-    if(novos.length > 0){ usuarios = novos; dadosCarregados = true; }
+    if(novos.length > 0){
+      // Mescla: adiciona colaboradores do fallback que não vieram da planilha
+      var loginsNovos = novos.map(function(u){ return u.login; });
+      var fallbackExtra = [
+        {nome:"ANA PAULA CHAVES SOARES", login:"ana", senha:"7382", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0}
+      ];
+      fallbackExtra.forEach(function(fb){
+        if(loginsNovos.indexOf(fb.login) === -1) novos.push(fb);
+      });
+      novos.sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt'); });
+      usuarios = novos;
+      dadosCarregados = true;
+    }
     else { console.warn('Nenhum colaborador válido encontrado, usando fallback'); carregarFallback(); }
   } catch(e){
     console.error('Erro ao carregar GSheets:', e);
@@ -757,14 +769,9 @@ async function carregarVendasDiarias(){
     var npl = {};
     usuarios.forEach(function(u){
       var partes = u.nome.toUpperCase().split(' ');
-      // Mapeia pelo primeiro nome
       var p1 = partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       npl[p1] = u.login;
-      // Mapeia também por "PRIMEIRO SEGUNDO" nome (ex: ANA PAULA) para evitar conflitos
-      if(partes[1]){
-        var p2 = p1 + ' ' + partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-        npl[p2] = u.login;
-      }
+      if(partes[1]){ npl[p1+' '+partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')] = u.login; }
     });
 
     var h0 = rows[0], h1 = rows[1]||[];
@@ -780,11 +787,8 @@ async function carregarVendasDiarias(){
     var vcm = {}, qcm = {}, pcc = {};
     for(var c=1; c<np.length; c++){
       var nome = np[c].toUpperCase(); if(!nome) continue;
-      var partes = nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');
-      // Tenta primeiro "PRIMEIRO SEGUNDO" nome (ex: ANA PAULA), depois só "PRIMEIRO"
-      var pr2 = partes[0] + (partes[1] ? ' ' + partes[1] : '');
-      var pr  = partes[0];
-      var lg = npl[pr2] || npl[pr]; if(!lg) continue;
+      var pts = nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');
+      var lg = npl[pts[0]+(pts[1]?' '+pts[1]:'')] || npl[pts[0]]; if(!lg) continue;
       if(!pcc[lg]) pcc[lg] = 0;
       pcc[lg]++;
       if(pcc[lg]===1) vcm[c] = lg;
@@ -1439,11 +1443,11 @@ function handleVendasXlsx(e){
       if(!shName) shName=wb.SheetNames[wb.SheetNames.length>1?1:0];
       var rows=XLSX.utils.sheet_to_json(wb.Sheets[shName],{header:1,defval:''});
       if(rows.length<2) throw new Error('aba vazia');
-      var npl={};usuarios.forEach(function(u){var partes=u.nome.toUpperCase().split(' ');var p1=partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');npl[p1]=u.login;if(partes[1]){var p2=p1+' '+partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'');npl[p2]=u.login;}});
+      var npl={};usuarios.forEach(function(u){var pts=u.nome.toUpperCase().split(' ');var p1=pts[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');npl[p1]=u.login;if(pts[1]){npl[p1+' '+pts[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')]=u.login;}});
       var h0=rows[0],h1=rows[1]||[];var subRe=/valor|venda|emitida|qtd|atend|quantidade/i;var h1Sub=h1.some(function(c){return subRe.test(String(c||'').trim());});
       var prLD=h1Sub?2:1;var np=[],un='';for(var c=0;c<h0.length;c++){var cn=String(h0[c]||'').trim();if(cn)un=cn;np.push(un);}
       var vcm={},qcm={},pcc={};
-      for(var c=1;c<np.length;c++){var nm=np[c].toUpperCase();if(!nm)continue;var pts=nm.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');var pr2=pts[0]+(pts[1]?' '+pts[1]:'');var pr=pts[0];var lg=npl[pr2]||npl[pr];if(!lg)continue;if(!pcc[lg])pcc[lg]=0;pcc[lg]++;if(pcc[lg]===1)vcm[c]=lg;else if(pcc[lg]===2)qcm[c]=lg;}
+      for(var c=1;c<np.length;c++){var nm=np[c].toUpperCase();if(!nm)continue;var pts=nm.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');var lg=npl[pts[0]+(pts[1]?' '+pts[1]:'')]||npl[pts[0]];if(!lg)continue;if(!pcc[lg])pcc[lg]=0;pcc[lg]++;if(pcc[lg]===1)vcm[c]=lg;else if(pcc[lg]===2)qcm[c]=lg;}
       vendasDiarias={};usuarios.forEach(function(u){vendasDiarias[u.login]=[];});
       var vk=Object.keys(vcm);var totD=0;
       for(var i=prLD;i<rows.length;i++){
