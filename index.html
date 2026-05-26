@@ -680,7 +680,24 @@ async function carregarDadosGSheets(){
                   login:loginRaw.toLowerCase(), senha:senhaRaw, metaQtdDia:qtd, metaTicketMeta:ticket});
     }
 
-    if(novos.length > 0){ usuarios = novos; dadosCarregados = true; }
+    if(novos.length > 0){
+      // Mescla com fallback: garante que colaboradores do fallback não desaparecem
+      // se por algum motivo não vieram na planilha
+      var fallbackTemp = [];
+      carregarFallback(); fallbackTemp = usuarios.slice();
+      // Reaplica os dados da planilha (mais atualizados) e adiciona fallback que não veio
+      var loginsNovos = novos.map(function(u){ return u.login; });
+      fallbackTemp.forEach(function(fb){
+        if(loginsNovos.indexOf(fb.login) === -1){
+          // Colaborador está no fallback mas não veio da planilha — mantém
+          novos.push(fb);
+        }
+      });
+      // Ordena por nome
+      novos.sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt'); });
+      usuarios = novos;
+      dadosCarregados = true;
+    }
     else { console.warn('Nenhum colaborador válido encontrado, usando fallback'); carregarFallback(); }
   } catch(e){
     console.error('Erro ao carregar GSheets:', e);
