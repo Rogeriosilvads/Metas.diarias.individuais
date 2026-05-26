@@ -1225,8 +1225,21 @@ function renderCalendario(){
       var _cor=_tipoCores[aus.tipo]||'#94a3b8';
       cel.style.background=_tipoBg[aus.tipo]||'rgba(100,116,139,0.18)';
       cel.style.border='1px solid '+(_tipoBd[aus.tipo]||'rgba(100,116,139,0.4)');
-      ne.style.color=_cor; ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='12px';
-      ae.textContent=aus.motivo?aus.motivo.slice(0,9):''; ae.style.color=_cor;
+      ne.style.color=_cor;
+      // Mostra ícone da ausência na linha do meio
+      ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
+      // Se tem venda no dia, mostra o valor embaixo em vez do motivo
+      if(dado && !dado.semVenda && dado.valor > 0){
+        // Dia com ausência E venda registrada
+        var corVenda = dado.valor >= meta ? '#86efac' : '#fca5a5';
+        ae.textContent = fmtCel(dado.valor);
+        ae.style.color = corVenda;
+        ae.style.fontSize = '8px';
+        ae.style.fontWeight = '700';
+      } else {
+        ae.textContent = aus.motivo ? aus.motivo.slice(0,7) : '';
+        ae.style.color = _cor;
+      }
     } else if(fut&&!dado){cel.style.background='rgba(30,41,59,0.3)';ne.style.color='#334155';}
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
@@ -1243,6 +1256,13 @@ function renderCalendario(){
           txt+=(_tipoIcons[aaus.tipo]||'📅')+' <span style="color:'+cor2+';font-weight:700;">'+lbl2+'</span>';
           if(aaus.motivo)txt+='<br><span style="color:#94a3b8;font-size:11px;">📝 '+aaus.motivo+'</span>';
           if(aaus.dias>1)txt+='<br><span style="color:#64748b;font-size:11px;">'+fmtBR(aaus.inicio)+' → '+fmtBR(aaus.fim)+' ('+aaus.dias+'d)</span>';
+          // Se tem venda no dia, mostra também
+          if(ddo && !ddo.semVenda && ddo.valor > 0){
+            var corV2 = ddo.valor >= mt ? '#4ade80' : '#f87171';
+            txt+='<br><span style="color:#64748b;font-size:10px;">────────</span>';
+            txt+='<br>💰 <span style="color:'+corV2+';font-weight:700;">'+brl(ddo.valor)+'</span>';
+            if(ddo.qtd) txt+='<br>👥 <span style="color:#94a3b8;">'+ddo.qtd+' atend.</span>';
+          }
         } else if(!ddo) txt+='<span style="color:#475569;">Sem registro</span>';
         else if(ddo.semVenda) txt+='<span style="color:#64748b;">'+(ddo.motivo==='Fechado'?'🔒 Fechado':ddo.motivo==='Faltou'?'✗ Faltou':'— '+(ddo.motivo||'Sem venda'))+'</span>';
         else if(ddo.devolucao) txt+='↩️ <span style="color:#fbbf24;">Devolução: '+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'');
