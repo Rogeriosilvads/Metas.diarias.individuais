@@ -682,7 +682,7 @@ function carregarFallback(){
     {nome:"FELIPE PEREIRA AMARAL",         login:"felipe",     senha:"9463", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"GESSICA DOS SANTOS ARAUJO",     login:"gessica",    senha:"3718", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IASMIN DOS SANTOS",             login:"iasmin",     senha:"5290", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
-    {nome:"IGOR PINA SANTOS",              login:"igor",       senha:"1234", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
+    {nome:"IGOR",                          login:"igor",       senha:"1234", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IRACI SANTANA SANTOS",          login:"iraci",      senha:"8641", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"LUCAS PINA DOS SANTOS",         login:"lucas",      senha:"1075", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"MARIA ANA DE JESUS DOS SANTOS", login:"maria",      senha:"4823", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
@@ -897,10 +897,19 @@ function getStDin(u){
   var venda = u.venda || 0;
   var falta = u.falta || 0;
   var meta = u.saldoMetas || 0;
+  var metaDia = u.metaDiaria || 0;
+
+  // Se não há meta definida E não há venda: sem dados, não é "meta batida"
+  var semDados = (meta === 0 && venda === 0 && metaDia === 0);
+  if(semDados) return{pct:0,label:'— Sem dados',color:'#475569'};
+
   var pct;
   if(meta > 0){ pct = Math.round((venda / meta) * 100); }
   else { var total = venda + Math.max(falta, 0); pct = total > 0 ? Math.round((venda / total) * 100) : 0; }
-  if(falta <= 0 || pct >= 100) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
+
+  // Só marca como batida se realmente vendeu algo OU se a meta é zero (meta zerada pelo gestor)
+  if(falta <= 0 && (venda > 0 || meta === 0)) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
+  if(pct >= 100 && venda > 0) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
   if(pct >= 85) return{pct:pct,label:'🔥 Falta pouco!',color:'#a3e635'};
   if(pct >= 60) return{pct:pct,label:'⚡ Quase lá!',color:'#fbbf24'};
   if(pct >= 30) return{pct:pct,label:'📈 No Caminho',color:'#f97316'};
@@ -964,7 +973,11 @@ document.getElementById('inp-admin-senha').addEventListener('keydown',function(e
 
 // ── PAINEL USUÁRIO ───────────────────────────
 function abrirPainel(){
-  var u=usuarioLogado; var st=getStatus(u.metaDiaria);
+  var u=usuarioLogado;
+  var stCor=getStatus(u.metaDiaria);
+  var stDin=getStDin(u);
+  var st={label:stDin.label, color:stCor.color, bg:stCor.bg};
+  if(stDin.label==='— Sem dados') st={label:'— Sem dados',color:'#475569',bg:'rgba(71,85,105,0.12)'};
   var banner=document.getElementById('admin-painel-banner');
   var btnSair=document.getElementById('painel-btn-sair');
   if(window._adminPainelAtivo){
