@@ -680,19 +680,7 @@ async function carregarDadosGSheets(){
                   login:loginRaw.toLowerCase(), senha:senhaRaw, metaQtdDia:qtd, metaTicketMeta:ticket});
     }
 
-    if(novos.length > 0){
-      // Mescla: adiciona colaboradores do fallback que não vieram da planilha
-      var loginsNovos = novos.map(function(u){ return u.login; });
-      var fallbackExtra = [
-        {nome:"ANA PAULA CHAVES SOARES", login:"ana", senha:"7382", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0}
-      ];
-      fallbackExtra.forEach(function(fb){
-        if(loginsNovos.indexOf(fb.login) === -1) novos.push(fb);
-      });
-      novos.sort(function(a,b){ return a.nome.localeCompare(b.nome,'pt'); });
-      usuarios = novos;
-      dadosCarregados = true;
-    }
+    if(novos.length > 0){ usuarios = novos; dadosCarregados = true; }
     else { console.warn('Nenhum colaborador válido encontrado, usando fallback'); carregarFallback(); }
   } catch(e){
     console.error('Erro ao carregar GSheets:', e);
@@ -768,10 +756,8 @@ async function carregarVendasDiarias(){
 
     var npl = {};
     usuarios.forEach(function(u){
-      var partes = u.nome.toUpperCase().split(' ');
-      var p1 = partes[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-      npl[p1] = u.login;
-      if(partes[1]){ npl[p1+' '+partes[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')] = u.login; }
+      var p = u.nome.toUpperCase().split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      npl[p] = u.login;
     });
 
     var h0 = rows[0], h1 = rows[1]||[];
@@ -787,8 +773,8 @@ async function carregarVendasDiarias(){
     var vcm = {}, qcm = {}, pcc = {};
     for(var c=1; c<np.length; c++){
       var nome = np[c].toUpperCase(); if(!nome) continue;
-      var pts = nome.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');
-      var lg = npl[pts[0]+(pts[1]?' '+pts[1]:'')] || npl[pts[0]]; if(!lg) continue;
+      var pr = nome.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      var lg = npl[pr]; if(!lg) continue;
       if(!pcc[lg]) pcc[lg] = 0;
       pcc[lg]++;
       if(pcc[lg]===1) vcm[c] = lg;
@@ -952,22 +938,12 @@ function getStatus(meta){
   return{label:'Você Consegue',color:'#ef4444',bg:'rgba(239,68,68,0.12)'};
 }
 function getStDin(u){
-  var venda = u.venda || 0;
-  var falta = u.falta || 0;
-  var meta = u.saldoMetas || 0;
-  // % = venda / meta_total_do_mês (saldoMetas)
-  // Se não tiver saldoMetas, fallback para venda/(venda+falta)
-  var pct;
-  if(meta > 0){
-    pct = Math.round((venda / meta) * 100);
-  } else {
-    var total = venda + Math.max(falta, 0);
-    pct = total > 0 ? Math.round((venda / total) * 100) : 0;
-  }
-  if(falta <= 0 || pct >= 100) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
-  if(pct >= 85) return{pct:pct,label:'🔥 Falta pouco!',color:'#a3e635'};
-  if(pct >= 60) return{pct:pct,label:'⚡ Quase lá!',color:'#fbbf24'};
-  if(pct >= 30) return{pct:pct,label:'📈 No Caminho',color:'#f97316'};
+  var falta=u.falta||0;
+  if(falta<=0) return{pct:100,label:'🏆 Meta Batida!',color:'#4ade80'};
+  var total=(u.venda||0)+falta; var pct=total>0?Math.round(((u.venda||0)/total)*100):0;
+  if(pct>=85) return{pct:pct,label:'🔥 Falta pouco!',color:'#a3e635'};
+  if(pct>=60) return{pct:pct,label:'⚡ Quase lá!',color:'#fbbf24'};
+  if(pct>=30) return{pct:pct,label:'📈 No Caminho',color:'#f97316'};
   return{pct:pct,label:'⚠️ Atenção!',color:'#f87171'};
 }
 function barraSt(u){
@@ -1239,21 +1215,8 @@ function renderCalendario(){
       var _cor=_tipoCores[aus.tipo]||'#94a3b8';
       cel.style.background=_tipoBg[aus.tipo]||'rgba(100,116,139,0.18)';
       cel.style.border='1px solid '+(_tipoBd[aus.tipo]||'rgba(100,116,139,0.4)');
-      ne.style.color=_cor;
-      // Mostra ícone da ausência na linha do meio
-      ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
-      // Se tem venda no dia, mostra o valor embaixo em vez do motivo
-      if(dado && !dado.semVenda && dado.valor > 0){
-        // Dia com ausência E venda registrada
-        var corVenda = dado.valor >= meta ? '#86efac' : '#fca5a5';
-        ae.textContent = fmtCel(dado.valor);
-        ae.style.color = corVenda;
-        ae.style.fontSize = '8px';
-        ae.style.fontWeight = '700';
-      } else {
-        ae.textContent = aus.motivo ? aus.motivo.slice(0,7) : '';
-        ae.style.color = _cor;
-      }
+      ne.style.color=_cor; ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='12px';
+      ae.textContent=aus.motivo?aus.motivo.slice(0,9):''; ae.style.color=_cor;
     } else if(fut&&!dado){cel.style.background='rgba(30,41,59,0.3)';ne.style.color='#334155';}
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
@@ -1270,13 +1233,6 @@ function renderCalendario(){
           txt+=(_tipoIcons[aaus.tipo]||'📅')+' <span style="color:'+cor2+';font-weight:700;">'+lbl2+'</span>';
           if(aaus.motivo)txt+='<br><span style="color:#94a3b8;font-size:11px;">📝 '+aaus.motivo+'</span>';
           if(aaus.dias>1)txt+='<br><span style="color:#64748b;font-size:11px;">'+fmtBR(aaus.inicio)+' → '+fmtBR(aaus.fim)+' ('+aaus.dias+'d)</span>';
-          // Se tem venda no dia, mostra também
-          if(ddo && !ddo.semVenda && ddo.valor > 0){
-            var corV2 = ddo.valor >= mt ? '#4ade80' : '#f87171';
-            txt+='<br><span style="color:#64748b;font-size:10px;">────────</span>';
-            txt+='<br>💰 <span style="color:'+corV2+';font-weight:700;">'+brl(ddo.valor)+'</span>';
-            if(ddo.qtd) txt+='<br>👥 <span style="color:#94a3b8;">'+ddo.qtd+' atend.</span>';
-          }
         } else if(!ddo) txt+='<span style="color:#475569;">Sem registro</span>';
         else if(ddo.semVenda) txt+='<span style="color:#64748b;">'+(ddo.motivo==='Fechado'?'🔒 Fechado':ddo.motivo==='Faltou'?'✗ Faltou':'— '+(ddo.motivo||'Sem venda'))+'</span>';
         else if(ddo.devolucao) txt+='↩️ <span style="color:#fbbf24;">Devolução: '+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'');
@@ -1443,11 +1399,11 @@ function handleVendasXlsx(e){
       if(!shName) shName=wb.SheetNames[wb.SheetNames.length>1?1:0];
       var rows=XLSX.utils.sheet_to_json(wb.Sheets[shName],{header:1,defval:''});
       if(rows.length<2) throw new Error('aba vazia');
-      var npl={};usuarios.forEach(function(u){var pts=u.nome.toUpperCase().split(' ');var p1=pts[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');npl[p1]=u.login;if(pts[1]){npl[p1+' '+pts[1].normalize('NFD').replace(/[\u0300-\u036f]/g,'')]=u.login;}});
+      var npl={};usuarios.forEach(function(u){var p=u.nome.toUpperCase().split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');npl[p]=u.login;});
       var h0=rows[0],h1=rows[1]||[];var subRe=/valor|venda|emitida|qtd|atend|quantidade/i;var h1Sub=h1.some(function(c){return subRe.test(String(c||'').trim());});
       var prLD=h1Sub?2:1;var np=[],un='';for(var c=0;c<h0.length;c++){var cn=String(h0[c]||'').trim();if(cn)un=cn;np.push(un);}
       var vcm={},qcm={},pcc={};
-      for(var c=1;c<np.length;c++){var nm=np[c].toUpperCase();if(!nm)continue;var pts=nm.normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(' ');var lg=npl[pts[0]+(pts[1]?' '+pts[1]:'')]||npl[pts[0]];if(!lg)continue;if(!pcc[lg])pcc[lg]=0;pcc[lg]++;if(pcc[lg]===1)vcm[c]=lg;else if(pcc[lg]===2)qcm[c]=lg;}
+      for(var c=1;c<np.length;c++){var nm=np[c].toUpperCase();if(!nm)continue;var pr=nm.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'');var lg=npl[pr];if(!lg)continue;if(!pcc[lg])pcc[lg]=0;pcc[lg]++;if(pcc[lg]===1)vcm[c]=lg;else if(pcc[lg]===2)qcm[c]=lg;}
       vendasDiarias={};usuarios.forEach(function(u){vendasDiarias[u.login]=[];});
       var vk=Object.keys(vcm);var totD=0;
       for(var i=prLD;i<rows.length;i++){
@@ -1581,9 +1537,9 @@ function salvarHistoricoMes(){
       historicoVendas[u.login][label] = {
         dias: dias,
         metaDiaria: u.metaDiaria,
-        saldoMetas: u.saldoMetas,  // meta total do mês (base do %)
-        venda: u.venda,            // venda realizada
-        falta: u.falta             // quanto falta
+        saldoMetas: u.saldoMetas,
+        venda: u.venda,
+        falta: u.falta
       };
     }
   });
@@ -1628,7 +1584,7 @@ function getDadosMes(login, labelM){
   // Se é o mês atual carregado, usa vendasDiarias
   if(labelM === labelMes()){
     var u = usuarios.find(function(x){ return x.login === login; });
-    return u ? {dias: vendasDiarias[login]||[], metaDiaria: u.metaDiaria, saldoMetas: u.saldoMetas, venda: u.venda, falta: u.falta} : null;
+    return u ? {dias: vendasDiarias[login]||[], metaDiaria: u.metaDiaria, saldo: u.saldoMetas, venda: u.venda, falta: u.falta} : null;
   }
   return null;
 }
@@ -1642,24 +1598,8 @@ function calcMetricasMes(dados){
   var totalAt = trabalhados.filter(function(d){ return d.qtd > 0; }).reduce(function(a,d){ return a + d.qtd; }, 0);
   var diasComAt = trabalhados.filter(function(d){ return d.qtd > 0; }).length;
   var ticket = (totalAt > 0) ? totalVenda / totalAt : 0;
-
-  // ✅ Base do %: saldoMetas (meta total do mês definida na planilha)
-  // saldoMetas = venda realizada + falta (= meta total)
-  // Quando falta < 0 significa que bateu e superou
-  var metaTotal;
-  if(dados.saldoMetas && dados.saldoMetas > 0){
-    // Vem direto da planilha — mais confiável
-    metaTotal = dados.saldoMetas;
-  } else if(dados.venda !== undefined && dados.falta !== undefined){
-    // Reconstrói: meta = venda + falta (falta pode ser negativa se superou)
-    metaTotal = (dados.venda || 0) + (dados.falta || 0);
-    if(metaTotal <= 0) metaTotal = dados.venda || 0; // se zerou ou negativo, usa venda
-  } else {
-    metaTotal = (dados.metaDiaria||0) * Math.max(trabalhados.length, 1);
-  }
-
+  var metaTotal = (dados.metaDiaria||0) * trabalhados.length;
   var pctMeta = metaTotal > 0 ? Math.round((totalVenda / metaTotal) * 100) : 0;
-
   return {
     totalVenda: totalVenda,
     trabalhados: trabalhados.length,
@@ -1855,7 +1795,7 @@ function renderDesempenho(){
     tr.innerHTML =
       '<td style="font-weight:700;color:'+(isB?'#4ade80':isA?'#fed7aa':'#f1f5f9')+';white-space:nowrap;">'+m+(isA?' ◀':'')+(isB?' ◀':'')+' </td>'+
       '<td style="color:#f1f5f9;font-weight:700;">'+brl(mt.totalVenda)+'</td>'+
-      '<td style="color:#64748b;" title="Meta total do mês">'+brl(mt.metaTotal)+'</td>'+
+      '<td style="color:#64748b;">'+brl(mt.metaTotal)+'</td>'+
       '<td><span style="background:'+corPct+'22;color:'+corPct+';border:1px solid '+corPct+'44;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;">'+mt.pctMeta+'%</span></td>'+
       '<td style="color:#94a3b8;">'+mt.totalAt+'</td>'+
       '<td style="color:#94a3b8;">'+brl(mt.ticket)+'</td>'+
