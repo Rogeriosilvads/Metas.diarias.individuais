@@ -1113,7 +1113,7 @@ async function carregarVersiculo(nome,data){
 // ── CALENDÁRIO ───────────────────────────────
 function abrirGrafico(){
   var u=usuarioLogado; if(!u) return;
-  var dias=vendasDiarias[u.login]||[]; var meta=u.metaDiaria;
+  var dias=vendasDiarias[u.login]||[]; var meta=Math.abs(u.metaDiaria||0);
   var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
   var hoje=new Date(); var mesRef=hoje.getMonth(); var anoRef=hoje.getFullYear();
   var prim=dias.find(function(d){return /^\d{2}\/\d{2}/.test(d.data);});
@@ -1121,7 +1121,7 @@ function abrirGrafico(){
   window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
   var comV=dias.filter(function(d){return !d.semVenda;});
   var bons=comV.filter(function(d){return meta>0&&d.valor>=meta;}).length;
-  var fracos=comV.filter(function(d){return d.valor<meta;}).length;
+  var fracos=comV.filter(function(d){return meta>0&&d.valor<meta;}).length;
   var media=comV.length?comV.reduce(function(a,d){return a+d.valor;},0)/comV.length:0;
   var melhor=comV.reduce(function(a,d){return d.valor>a.valor?d:a;},comV[0]||{valor:0,data:'--'});
   var pior=comV.reduce(function(a,d){return d.valor<a.valor?d:a;},comV[0]||{valor:0,data:'--'});
@@ -1158,7 +1158,7 @@ function calNavegar(delta){
   renderCalendario();
 }
 function renderCalendario(){
-  var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa; var meta=st.meta;
+  var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa; var meta=Math.abs(st.meta||0);
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('cal-titulo').textContent=meses[mes]+' de '+ano;
   var grid=document.getElementById('cal-grid'); grid.innerHTML='';
@@ -1197,7 +1197,7 @@ function renderCalendario(){
       ne.style.color=_cor;
       ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
       if(dado && !dado.semVenda && dado.valor > 0){
-        var corVenda = dado.valor >= meta ? '#86efac' : '#fca5a5';
+        var corVenda = (meta>0 && dado.valor >= meta) ? '#86efac' : '#fca5a5';
         ae.textContent = fmtCel(dado.valor);
         ae.style.color = corVenda;
         ae.style.fontSize = '8px';
@@ -1222,7 +1222,7 @@ function renderCalendario(){
           txt+=(_tipoIcons[aaus.tipo]||'📅')+' <span style="color:'+cor2+';font-weight:700;">'+lbl2+'</span>';
           if(aaus.motivo)txt+='<br><span style="color:#94a3b8;font-size:11px;">📝 '+aaus.motivo+'</span>';
           if(ddo && !ddo.semVenda && ddo.valor > 0){
-            var corV2 = ddo.valor >= mt ? '#4ade80' : '#f87171';
+            var corV2 = (mt>0 && ddo.valor >= mt) ? '#4ade80' : '#f87171';
             txt+='<br><span style="color:#64748b;font-size:10px;">────────</span>';
             txt+='<br>💰 <span style="color:'+corV2+';font-weight:700;">'+brl(ddo.valor)+'</span>';
             if(ddo.qtd) txt+='<br>👥 <span style="color:#94a3b8;">'+ddo.qtd+' atend.</span>';
