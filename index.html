@@ -1120,7 +1120,7 @@ function abrirGrafico(){
   if(prim){var pts=prim.data.split('/');mesRef=parseInt(pts[1],10)-1;}
   window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
   var comV=dias.filter(function(d){return !d.semVenda;});
-  var bons=comV.filter(function(d){return d.valor>=meta;}).length;
+  var bons=comV.filter(function(d){return meta>0&&d.valor>=meta;}).length;
   var fracos=comV.filter(function(d){return d.valor<meta;}).length;
   var media=comV.length?comV.reduce(function(a,d){return a+d.valor;},0)/comV.length:0;
   var melhor=comV.reduce(function(a,d){return d.valor>a.valor?d:a;},comV[0]||{valor:0,data:'--'});
@@ -1210,8 +1210,8 @@ function renderCalendario(){
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
     else if(dado.devolucao){cel.style.background='rgba(245,158,11,0.15)';cel.style.border='1px solid rgba(245,158,11,0.4)';ne.style.color='#fbbf24';ve.textContent=fmtCel(dado.valor);ve.style.color='#fde68a';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else if(dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else if(meta>0&&dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else if(meta<=0&&dado.valor>0){cel.style.background='rgba(100,116,139,0.25)';cel.style.border='1px solid rgba(100,116,139,0.4)';ne.style.color='#94a3b8';ve.textContent=fmtCel(dado.valor);ve.style.color='#cbd5e1';ae.textContent=dado.qtd?dado.qtd+' at.':'';}    else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     if(ehHj) cel.style.boxShadow='0 0 0 2px #f97316';
     (function(ddo,chv,mt,aaus){
       cel.addEventListener('mouseenter',function(e){
@@ -1230,7 +1230,7 @@ function renderCalendario(){
         } else if(!ddo) txt+='<span style="color:#475569;">Sem registro</span>';
         else if(ddo.semVenda) txt+='<span style="color:#64748b;">'+(ddo.motivo==='Fechado'?'🔒 Fechado':ddo.motivo==='Faltou'?'✗ Faltou':'— '+(ddo.motivo||'Sem venda'))+'</span>';
         else if(ddo.devolucao) txt+='↩️ <span style="color:#fbbf24;">Devolução: '+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'');
-        else if(ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta: '+brl(mt)+'</span>';
+        else if(mt>0&&ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta: '+brl(mt)+'</span>';
         else txt+='📉 <span style="color:#f87171;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#64748b;font-size:11px;">Meta: '+brl(mt)+' (faltou '+brl(mt-ddo.valor)+')</span>';
         tip.innerHTML=txt; tip.style.display='block'; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-10)+'px';
       });
@@ -1699,7 +1699,7 @@ function calcMetricasMes(dados){
   if(!dados || !dados.dias) return null;
   var dias = dados.dias;
   var trabalhados = dias.filter(function(d){ return !d.semVenda; });
-  var bons = trabalhados.filter(function(d){ return d.valor >= (dados.metaDiaria||0); });
+  var bons = trabalhados.filter(function(d){ return (dados.metaDiaria||0)>0 && d.valor >= (dados.metaDiaria||0); });
   var totalVenda = trabalhados.reduce(function(a,d){ return a + d.valor; }, 0);
   var totalAt = trabalhados.filter(function(d){ return d.qtd > 0; }).reduce(function(a,d){ return a + d.qtd; }, 0);
   var diasComAt = trabalhados.filter(function(d){ return d.qtd > 0; }).length;
