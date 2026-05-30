@@ -367,31 +367,11 @@
       <div style="overflow-x:auto;"><table><thead><tr><th>Nome</th><th>Login</th><th>Saldo Metas</th><th>Venda</th><th>Falta</th><th>Meta/Dia</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-tbody"></tbody></table></div>
     </div>
     <div id="admin-ranking-atend" class="hidden" style="background:rgba(10,32,32,0.85);border:1px solid rgba(249,115,22,0.2);border-radius:20px;overflow:hidden;margin-bottom:24px;">
-      <div style="padding:20px 24px;border-bottom:1px solid rgba(249,115,22,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div style="padding:20px 24px;border-bottom:1px solid rgba(249,115,22,0.15);display:flex;justify-content:space-between;align-items:center;">
         <h3 style="color:#f1f5f9;margin:0;font-size:15px;font-weight:700;">👥 Ranking de Atendimentos</h3>
-        <span style="color:#64748b;font-size:11px;">ordenado por total de atendimentos no mês</span>
+        <span style="color:#64748b;font-size:11px;">por total de atendimentos</span>
       </div>
-      <!-- Cards de resumo geral -->
-      <div id="atend-cards-resumo" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:16px;border-bottom:1px solid rgba(249,115,22,0.1);"></div>
-      <!-- Tabela ranking -->
-      <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:36px;">#</th>
-              <th>Colaborador</th>
-              <th>Total Atend.</th>
-              <th>Média/Dia</th>
-              <th>Meta Diária</th>
-              <th>Ticket Médio</th>
-              <th>Dias c/ Qtd</th>
-              <th>% da Meta</th>
-              <th>Progresso</th>
-            </tr>
-          </thead>
-          <tbody id="admin-atend-tbody"></tbody>
-        </table>
-      </div>
+      <div style="overflow-x:auto;"><table><thead><tr><th style="width:40px;">#</th><th>Colaborador</th><th>Total Atend.</th><th>Média/dia</th><th>Meta Diária</th><th>Ticket Médio</th><th>Dias c/ Qtd</th><th>% na meta</th></tr></thead><tbody id="admin-atend-tbody"></tbody></table></div>
     </div>
     <div id="admin-folgas-section" style="background:rgba(10,32,32,0.85);border:1px solid rgba(59,130,246,0.25);border-radius:20px;overflow:hidden;margin-bottom:24px;">
       <div style="padding:20px 24px;border-bottom:1px solid rgba(59,130,246,0.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
@@ -701,7 +681,7 @@ function carregarFallback(){
     {nome:"FAGNER MAGALHAES FONTES",       login:"fagner",     senha:"6134", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"FELIPE PEREIRA AMARAL",         login:"felipe",     senha:"9463", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"GESSICA DOS SANTOS ARAUJO",     login:"gessica",    senha:"3718", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
-    {nome:"IASMIM DOS SANTOS",             login:"iasmim",     senha:"5290", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
+    {nome:"IASMIN DOS SANTOS",             login:"iasmin",     senha:"5290", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IGOR",                          login:"igor",       senha:"1234", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"IRACI SANTANA SANTOS",          login:"iraci",      senha:"8641", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
     {nome:"LUCAS PINA DOS SANTOS",         login:"lucas",      senha:"1075", saldoMetas:0, venda:0, falta:0, metaDiaria:0, metaQtdDia:0, metaTicketMeta:0},
@@ -1113,15 +1093,15 @@ async function carregarVersiculo(nome,data){
 // ── CALENDÁRIO ───────────────────────────────
 function abrirGrafico(){
   var u=usuarioLogado; if(!u) return;
-  var dias=vendasDiarias[u.login]||[]; var meta=Math.abs(u.metaDiaria||0);
+  var dias=vendasDiarias[u.login]||[]; var meta=u.metaDiaria;
   var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
   var hoje=new Date(); var mesRef=hoje.getMonth(); var anoRef=hoje.getFullYear();
   var prim=dias.find(function(d){return /^\d{2}\/\d{2}/.test(d.data);});
   if(prim){var pts=prim.data.split('/');mesRef=parseInt(pts[1],10)-1;}
   window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
   var comV=dias.filter(function(d){return !d.semVenda;});
-  var bons=comV.filter(function(d){return meta>0&&d.valor>=meta;}).length;
-  var fracos=comV.filter(function(d){return meta>0&&d.valor<meta;}).length;
+  var bons=comV.filter(function(d){return d.valor>=meta;}).length;
+  var fracos=comV.filter(function(d){return d.valor<meta;}).length;
   var media=comV.length?comV.reduce(function(a,d){return a+d.valor;},0)/comV.length:0;
   var melhor=comV.reduce(function(a,d){return d.valor>a.valor?d:a;},comV[0]||{valor:0,data:'--'});
   var pior=comV.reduce(function(a,d){return d.valor<a.valor?d:a;},comV[0]||{valor:0,data:'--'});
@@ -1158,7 +1138,7 @@ function calNavegar(delta){
   renderCalendario();
 }
 function renderCalendario(){
-  var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa; var meta=Math.abs(st.meta||0);
+  var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa; var meta=st.meta;
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('cal-titulo').textContent=meses[mes]+' de '+ano;
   var grid=document.getElementById('cal-grid'); grid.innerHTML='';
@@ -1197,7 +1177,7 @@ function renderCalendario(){
       ne.style.color=_cor;
       ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
       if(dado && !dado.semVenda && dado.valor > 0){
-        var corVenda = (meta>0 && dado.valor >= meta) ? '#86efac' : '#fca5a5';
+        var corVenda = dado.valor >= meta ? '#86efac' : '#fca5a5';
         ae.textContent = fmtCel(dado.valor);
         ae.style.color = corVenda;
         ae.style.fontSize = '8px';
@@ -1210,8 +1190,8 @@ function renderCalendario(){
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
     else if(dado.devolucao){cel.style.background='rgba(245,158,11,0.15)';cel.style.border='1px solid rgba(245,158,11,0.4)';ne.style.color='#fbbf24';ve.textContent=fmtCel(dado.valor);ve.style.color='#fde68a';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else if(meta>0&&dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else if(meta<=0&&dado.valor>0){cel.style.background='rgba(100,116,139,0.25)';cel.style.border='1px solid rgba(100,116,139,0.4)';ne.style.color='#94a3b8';ve.textContent=fmtCel(dado.valor);ve.style.color='#cbd5e1';ae.textContent=dado.qtd?dado.qtd+' at.':'';}    else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else if(dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     if(ehHj) cel.style.boxShadow='0 0 0 2px #f97316';
     (function(ddo,chv,mt,aaus){
       cel.addEventListener('mouseenter',function(e){
@@ -1222,7 +1202,7 @@ function renderCalendario(){
           txt+=(_tipoIcons[aaus.tipo]||'📅')+' <span style="color:'+cor2+';font-weight:700;">'+lbl2+'</span>';
           if(aaus.motivo)txt+='<br><span style="color:#94a3b8;font-size:11px;">📝 '+aaus.motivo+'</span>';
           if(ddo && !ddo.semVenda && ddo.valor > 0){
-            var corV2 = (mt>0 && ddo.valor >= mt) ? '#4ade80' : '#f87171';
+            var corV2 = ddo.valor >= mt ? '#4ade80' : '#f87171';
             txt+='<br><span style="color:#64748b;font-size:10px;">────────</span>';
             txt+='<br>💰 <span style="color:'+corV2+';font-weight:700;">'+brl(ddo.valor)+'</span>';
             if(ddo.qtd) txt+='<br>👥 <span style="color:#94a3b8;">'+ddo.qtd+' atend.</span>';
@@ -1230,7 +1210,7 @@ function renderCalendario(){
         } else if(!ddo) txt+='<span style="color:#475569;">Sem registro</span>';
         else if(ddo.semVenda) txt+='<span style="color:#64748b;">'+(ddo.motivo==='Fechado'?'🔒 Fechado':ddo.motivo==='Faltou'?'✗ Faltou':'— '+(ddo.motivo||'Sem venda'))+'</span>';
         else if(ddo.devolucao) txt+='↩️ <span style="color:#fbbf24;">Devolução: '+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'');
-        else if(mt>0&&ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta: '+brl(mt)+'</span>';
+        else if(ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta: '+brl(mt)+'</span>';
         else txt+='📉 <span style="color:#f87171;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#64748b;font-size:11px;">Meta: '+brl(mt)+' (faltou '+brl(mt-ddo.valor)+')</span>';
         tip.innerHTML=txt; tip.style.display='block'; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-10)+'px';
       });
@@ -1292,147 +1272,23 @@ async function trocarMes(gid){
 function renderRankingAt(){
   var dados=[];
   usuarios.forEach(function(u){
-    var dias=vendasDiarias[u.login]||[];
-    var cq=dias.filter(function(d){return !d.semVenda&&d.qtd>0;});
+    var dias=vendasDiarias[u.login]||[]; var cq=dias.filter(function(d){return !d.semVenda&&d.qtd>0;});
     if(!cq.length) return;
-    var ta=cq.reduce(function(a,d){return a+d.qtd;},0);
-    var tv=cq.reduce(function(a,d){return a+d.valor;},0);
-    var tick=tv/ta;
-    var metaAt=(u.metaQtdDia&&u.metaQtdDia>0)?u.metaQtdDia:Math.ceil(u.metaDiaria/tick);
-    var diasNaMeta=cq.filter(function(d){return d.qtd>=metaAt;}).length;
-    var pctMeta=metaAt>0?Math.round((ta/(metaAt*cq.length))*100):0;
-
-    // Dados do mês anterior para comparação
-    var mesPrevLabel=getMesAnteriorLabel();
-    var dadosPrev=getDadosMes(u.login, mesPrevLabel);
-    var prevTick=0, prevMedia=0, prevMetaAt=0;
-    if(dadosPrev&&dadosPrev.dias){
-      var cqPrev=dadosPrev.dias.filter(function(d){return !d.semVenda&&d.qtd>0;});
-      if(cqPrev.length>0){
-        var taPrev=cqPrev.reduce(function(a,d){return a+d.qtd;},0);
-        var tvPrev=cqPrev.reduce(function(a,d){return a+d.valor;},0);
-        prevTick=tvPrev/taPrev;
-        prevMedia=taPrev/cqPrev.length;
-        prevMetaAt=(dadosPrev.metaQtdDia&&dadosPrev.metaQtdDia>0)?dadosPrev.metaQtdDia:Math.ceil((dadosPrev.metaDiaria||0)/prevTick);
-      }
-    }
-
-    dados.push({
-      login:u.login, nome:u.nome.split(' ')[0], nomeCompleto:u.nome,
-      total:ta, media:ta/cq.length, metaAt:metaAt, ticket:tick,
-      dias:cq.length, pctMeta:pctMeta, diasNaMeta:diasNaMeta,
-      prevTick:prevTick, prevMedia:prevMedia, prevMetaAt:prevMetaAt
-    });
+    var ta=cq.reduce(function(a,d){return a+d.qtd;},0); var tv=cq.reduce(function(a,d){return a+d.valor;},0);
+    var tick=tv/ta; var metaAt=Math.ceil(u.metaDiaria/tick); var pct=Math.round((cq.filter(function(d){return d.qtd>=metaAt;}).length/cq.length)*100);
+    dados.push({nome:u.nome.split(' ')[0],total:ta,media:ta/cq.length,metaAt:metaAt,ticket:tick,dias:cq.length,pct:pct});
   });
-
   if(!dados.length){document.getElementById('admin-ranking-atend').classList.add('hidden');return;}
   dados.sort(function(a,b){return b.total-a.total;});
-
-  // ── CARDS DE RESUMO GERAL ──
-  var totalAtGeral=dados.reduce(function(a,d){return a+d.total;},0);
-  var mediaGeralDia=dados.length>0?(dados.reduce(function(a,d){return a+d.media;},0)/dados.length):0;
-  var metaDiariaGeral=dados.length>0?Math.round(dados.reduce(function(a,d){return a+d.metaAt;},0)/dados.length):0;
-  var ticketGeralArr=dados.filter(function(d){return d.ticket>0;});
-  var ticketGeral=ticketGeralArr.length>0?ticketGeralArr.reduce(function(a,d){return a+d.ticket;},0)/ticketGeralArr.length:0;
-  var melhorPct=dados.reduce(function(a,d){return d.pctMeta>a.pctMeta?d:a;},dados[0]);
-
-  // Variação total vs mês anterior
-  var totalPrevGeral=0;
-  dados.forEach(function(d){
-    var mesPrevLabel=getMesAnteriorLabel();
-    var dp=getDadosMes(d.login,mesPrevLabel);
-    if(dp&&dp.dias){var cqp=dp.dias.filter(function(x){return !x.semVenda&&x.qtd>0;});if(cqp.length)totalPrevGeral+=cqp.reduce(function(a,x){return a+x.qtd;},0);}
-  });
-  var varTotal=totalPrevGeral>0?((totalAtGeral-totalPrevGeral)/totalPrevGeral*100):0;
-  var varMediaGeral=0;
-  if(dados.length>0){
-    var prevMediaGeralSum=dados.reduce(function(a,d){return a+d.prevMedia;},0);
-    var prevMediaGeralAvg=prevMediaGeralSum/dados.length;
-    varMediaGeral=prevMediaGeralAvg>0?((mediaGeralDia-prevMediaGeralAvg)/prevMediaGeralAvg*100):0;
-  }
-
-  function varTag(v){
-    if(v===0||isNaN(v)||!isFinite(v)) return '';
-    var cor=v>0?'#4ade80':'#f87171'; var seta=v>0?'↑':'↓';
-    return '<div style="font-size:11px;font-weight:700;color:'+cor+';margin-top:3px;">'+seta+' '+Math.abs(v).toFixed(1)+'% <span style="color:#475569;font-weight:400;font-size:10px;">vs mês anterior</span></div>';
-  }
-
-  function cardResumo(icone,titulo,valor,varV,corValor,extra){
-    corValor=corValor||'#f1f5f9';
-    return '<div style="background:rgba(8,28,28,0.7);border:1px solid rgba(249,115,22,0.15);border-radius:14px;padding:16px 14px;">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'+
-        '<span style="font-size:22px;">'+icone+'</span>'+
-        '<span style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">'+titulo+'</span>'+
-      '</div>'+
-      '<div style="font-size:24px;font-weight:800;color:'+corValor+';line-height:1;">'+valor+'</div>'+
-      (extra?'<div style="color:#64748b;font-size:10px;margin-top:2px;">'+extra+'</div>':'')+
-      varTag(varV)+
-    '</div>';
-  }
-
-  var resumoEl=document.getElementById('atend-cards-resumo');
-  resumoEl.innerHTML=
-    cardResumo('👥','Total Atendimentos',totalAtGeral.toLocaleString('pt-BR'),varTotal,'#f1f5f9','este mês')+
-    cardResumo('📈','Média Geral',mediaGeralDia.toFixed(0),varMediaGeral,'#fed7aa','atendimentos/dia')+
-    cardResumo('🎯','Meta Diária',metaDiariaGeral,0,'#4ade80',metaDiariaGeral>0?Math.round(dados.filter(function(d){return d.pctMeta>=100;}).length/dados.length*100)+'% da meta':'')+
-    cardResumo('⭐','Ticket Médio',brl(ticketGeral),0,'#fbbf24','')+
-    (melhorPct?'<div style="background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(109,40,217,0.1));border:1px solid rgba(139,92,246,0.3);border-radius:14px;padding:16px 14px;">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="font-size:22px;">👑</span><span style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Maior % da Meta</span></div>'+
-      '<div style="font-size:24px;font-weight:800;color:#c4b5fd;line-height:1;">'+melhorPct.pctMeta+'%</div>'+
-      '<div style="color:#a78bfa;font-size:11px;font-weight:700;margin-top:3px;">'+melhorPct.nome+'</div>'+
-    '</div>':'');
-
-  // ── TABELA RANKING ──
   var tbody=document.getElementById('admin-atend-tbody'); tbody.innerHTML='';
-  var medalhas=['🥇','🥈','🥉'];
-  var maxTotal=dados[0]?dados[0].total:1;
-
+  var md=['🥇','🥈','🥉'];
   dados.forEach(function(d,idx){
-    var pos=idx<3?medalhas[idx]:'<span style="color:#475569;font-weight:700;">'+(idx+1)+'</span>';
-    var corPct=d.pctMeta>=100?'#4ade80':d.pctMeta>=80?'#fbbf24':d.pctMeta>=50?'#f97316':'#f87171';
-    var bgPct=d.pctMeta>=100?'rgba(34,197,94,0.12)':d.pctMeta>=80?'rgba(251,191,36,0.12)':d.pctMeta>=50?'rgba(249,115,22,0.12)':'rgba(239,68,68,0.12)';
-    var barra=Math.min(Math.round((d.total/maxTotal)*100),100);
-
-    // Variação ticket
-    var varTick=d.prevTick>0?((d.ticket-d.prevTick)/d.prevTick*100):0;
-    var corVT=varTick>0?'#4ade80':varTick<0?'#f87171':'#475569';
-    var setaVT=varTick>0?'↑':varTick<0?'↓':'';
-    var tickHtml=brl(d.ticket)+(varTick!==0&&d.prevTick>0?'<br><span style="font-size:10px;color:'+corVT+';font-weight:700;">'+setaVT+' '+Math.abs(varTick).toFixed(0)+'%</span>':'');
-
+    var pos=md[idx]||(idx+1); var cor=d.pct>=60?'#4ade80':d.pct>=40?'#fbbf24':'#f87171';
     var tr=document.createElement('tr');
-    tr.style.cursor='pointer';
-    tr.innerHTML=
-      '<td style="text-align:center;font-size:17px;">'+pos+'</td>'+
-      '<td style="color:#f1f5f9;font-weight:700;white-space:nowrap;">'+d.nome+'</td>'+
-      '<td style="font-size:18px;font-weight:800;color:#4ade80;">'+d.total.toLocaleString('pt-BR')+'</td>'+
-      '<td style="color:#94a3b8;font-weight:600;">'+d.media.toFixed(1)+'</td>'+
-      '<td style="color:#fed7aa;font-weight:700;">'+d.metaAt+'</td>'+
-      '<td style="color:#94a3b8;font-size:12px;">'+tickHtml+'</td>'+
-      '<td style="color:#64748b;">'+d.dias+' dias</td>'+
-      '<td><span style="background:'+bgPct+';color:'+corPct+';border:1px solid '+corPct+'44;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:800;">'+d.pctMeta+'%</span></td>'+
-      '<td style="min-width:120px;">'+
-        '<div style="display:flex;align-items:center;gap:6px;">'+
-          '<div style="flex:1;height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">'+
-            '<div style="width:'+barra+'%;height:100%;background:linear-gradient(90deg,'+corPct+'88,'+corPct+');border-radius:4px;transition:width 0.5s;"></div>'+
-          '</div>'+
-          '<span style="font-size:10px;color:#475569;min-width:28px;">'+barra+'%</span>'+
-        '</div>'+
-      '</td>';
+    tr.innerHTML='<td style="font-size:16px;text-align:center;">'+pos+'</td><td style="color:#f1f5f9;font-weight:700;">'+d.nome+'</td><td style="font-size:17px;font-weight:800;color:#fed7aa;">'+d.total+'</td><td style="color:#94a3b8;">'+d.media.toFixed(1)+'</td><td style="color:#fed7aa;font-weight:700;">'+d.metaAt+' at.</td><td style="color:#94a3b8;">'+brl(d.ticket)+'</td><td style="color:#64748b;">'+d.dias+' dias</td><td><span style="background:'+cor+'22;color:'+cor+';border:1px solid '+cor+'44;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;">'+d.pct+'%</span></td>';
     tbody.appendChild(tr);
   });
-
   document.getElementById('admin-ranking-atend').classList.remove('hidden');
-}
-
-function getMesAnteriorLabel(){
-  var idx=SHEET_MESES.findIndex(function(x){return x.gid===mesSelecionado;});
-  if(idx>0) return SHEET_MESES[idx-1].label;
-  // fallback: mês anterior pelo calendário
-  var hoje=new Date();
-  var nms=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  var m=hoje.getMonth()>0?hoje.getMonth()-1:11;
-  var a=hoje.getMonth()>0?hoje.getFullYear():hoje.getFullYear()-1;
-  return nms[m]+' '+a;
 }
 function renderTabela(){
   var tbody=document.getElementById('admin-tbody'); tbody.innerHTML='';
@@ -1699,7 +1555,7 @@ function calcMetricasMes(dados){
   if(!dados || !dados.dias) return null;
   var dias = dados.dias;
   var trabalhados = dias.filter(function(d){ return !d.semVenda; });
-  var bons = trabalhados.filter(function(d){ return (dados.metaDiaria||0)>0 && d.valor >= (dados.metaDiaria||0); });
+  var bons = trabalhados.filter(function(d){ return d.valor >= (dados.metaDiaria||0); });
   var totalVenda = trabalhados.reduce(function(a,d){ return a + d.valor; }, 0);
   var totalAt = trabalhados.filter(function(d){ return d.qtd > 0; }).reduce(function(a,d){ return a + d.qtd; }, 0);
   var diasComAt = trabalhados.filter(function(d){ return d.qtd > 0; }).length;
