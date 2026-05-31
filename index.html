@@ -820,6 +820,8 @@ async function init(){
   await carregarVendasDiarias();
   carregarAusenciasLS();
   await carregarFolgasGitHub();
+  // Grava/atualiza metas progressivas para todos os usuários ao carregar
+  usuarios.forEach(function(u){ gravarERecalcularMeta(u); });
   document.getElementById('loading-overlay').style.display='none';
 }
 init();
@@ -842,36 +844,170 @@ function mostrarToast(msg,cor){
   clearTimeout(t._timer); t._timer=setTimeout(function(){t.classList.remove('show');},3200);
 }
 
-// ── CORREÇÃO PRINCIPAL: calcMetaDiaria ────────────────────────────────────────
-// Calcula a meta diária real de um usuário, com múltiplos fallbacks para garantir
-// que o calendário sempre use um valor correto para colorir os dias.
+// ══════════════════════════════════════════════════════════════════
+// SISTEMA DE METAS PROGRESSIVAS DIÁRIAS
+// - Meta de cada dia é calculada: saldo restante ÷ dias úteis restantes
+// - Dias úteis = seg a sáb, excluindo feriados nacionais fixos
+// - Cada dia gravado fica imutável no localStorage
+// - Ao carregar planilha: grava meta do dia atual e redistribui saldo
+// ══════════════════════════════════════════════════════════════════
+
+var LS_METAS_PROG = 'farm-metas-prog'; // chave localStorage
+
+// Feriados nacionais fixos (MM-DD)
+var FERIADOS_FIXOS = [
+  '01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25'
+];
+
+function isFeriado(ano, mes, dia){
+  var mmdd = String(mes+1).padStart(2,'0')+'-'+String(dia).padStart(2,'0');
+  // Páscoa (variável) - calculamos para o ano corrente
+  var pascoa = calcPascoa(ano);
+  var sextaS = new Date(pascoa); sextaS.setDate(sextaS.getDate()-2);
+  var carnaval1 = new Date(pascoa); carnaval1.setDate(carnaval1.getDate()-48);
+  var carnaval2 = new Date(pascoa); carnaval2.setDate(carnaval2.getDate()-47);
+  var corpusChristi = new Date(pascoa); corpusChristi.setDate(corpusChristi.getDate()+60);
+  var feriadosMoveis = [
+    fmtMmDd(pascoa), fmtMmDd(sextaS), fmtMmDd(carnaval1),
+    fmtMmDd(carnaval2), fmtMmDd(corpusChristi)
+  ];
+  return FERIADOS_FIXOS.indexOf(mmdd) !== -1 || feriadosMoveis.indexOf(mmdd) !== -1;
+}
+
+function calcPascoa(Y){
+  // Algoritmo de Butcher
+  var a=Y%19,b=Math.floor(Y/100),c=Y%100,d=Math.floor(b/4),e=b%4;
+  var f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  var i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7;
+  var m=Math.floor((a+11*h+22*l)/451);
+  var mes=Math.floor((h+l-7*m+114)/31)-1;
+  var dia=((h+l-7*m+114)%31)+1;
+  return new Date(Y,mes,dia);
+}
+function fmtMmDd(dt){ return String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+
+// Verifica se uma data é dia útil (seg=1..sáb=6, exceto feriado)
+function isDiaUtil(ano, mes, dia){
+  var dt = new Date(ano, mes, dia);
+  var dow = dt.getDay(); // 0=dom,6=sáb
+  if(dow === 0) return false; // domingo fora
+  if(isFeriado(ano, mes, dia)) return false;
+  return true;
+}
+
+// Conta dias úteis restantes no mês a partir de uma data (inclusive)
+function diasUteisRestantes(anoRef, mesRef, diaRef){
+  var ult = new Date(anoRef, mesRef+1, 0).getDate();
+  var count = 0;
+  for(var d = diaRef; d <= ult; d++){
+    if(isDiaUtil(anoRef, mesRef, d)) count++;
+  }
+  return count;
+}
+
+// Retorna chave ISO do mês atual (ex: "2026-05")
+function chaveMes(){ var h=new Date(); return h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0'); }
+
+// Carrega histórico de metas progressivas do localStorage
+function carregarMetasLS(){
+  try{ return JSON.parse(localStorage.getItem(LS_METAS_PROG)||'{}'); }catch(e){ return {}; }
+}
+function salvarMetasLS(obj){ try{ localStorage.setItem(LS_METAS_PROG, JSON.stringify(obj)); }catch(e){} }
+
+// Retorna a meta gravada para o login+data (YYYY-MM-DD)
+function getMetaGravada(login, dataISO){
+  var db = carregarMetasLS();
+  return (db[login] && db[login][dataISO]) ? db[login][dataISO] : null;
+}
+
+// Grava (uma só vez) a meta de um dia para um login
+function gravarMetaDia(login, dataISO, valor){
+  var db = carregarMetasLS();
+  if(!db[login]) db[login] = {};
+  if(!db[login][dataISO]){ // só grava se ainda não gravado
+    db[login][dataISO] = Math.round(valor);
+    salvarMetasLS(db);
+  }
+}
+
+// ── MOTOR PRINCIPAL: grava meta de hoje e recalcula saldo restante ──
+function gravarERecalcularMeta(u){
+  if(!u || !u.login) return;
+
+  var hoje = new Date();
+  var anoH = hoje.getFullYear(), mesH = hoje.getMonth(), diaH = hoje.getDate();
+  var hojeStr = dataISO(); // YYYY-MM-DD
+
+  // Só age em dias úteis
+  if(!isDiaUtil(anoH, mesH, diaH)) return;
+
+  // Saldo restante = falta para meta (vem da planilha, campo "falta")
+  // Se já tem meta gravada para hoje, usa ela; senão calcula e grava
+  var metaHoje = getMetaGravada(u.login, hojeStr);
+  if(!metaHoje || metaHoje <= 0){
+    // Calcula: saldo ÷ dias úteis restantes (inclui hoje)
+    var saldoRestante = Math.abs(u.falta || 0);
+
+    // Se falta = 0 mas ainda há saldo de metas, usa saldoMetas
+    if(saldoRestante <= 0 && u.saldoMetas > 0) saldoRestante = u.saldoMetas;
+
+    // Se nem isso, tenta metaDiaria direto da planilha
+    if(saldoRestante <= 0 && u.metaDiaria > 0){
+      saldoRestante = u.metaDiaria; // usa direto sem dividir
+      gravarMetaDia(u.login, hojeStr, saldoRestante);
+      return;
+    }
+
+    var diasRestantes = diasUteisRestantes(anoH, mesH, diaH);
+    if(diasRestantes <= 0) diasRestantes = 1;
+
+    metaHoje = Math.round(saldoRestante / diasRestantes);
+    if(metaHoje > 0) gravarMetaDia(u.login, hojeStr, metaHoje);
+  }
+}
+
+// ── calcMetaDiaria: retorna meta correta para exibição ──
+// Prioridade: 1) meta gravada para hoje, 2) metaDiaria da planilha,
+// 3) calcula pelo saldo, 4) média dos dias com venda
 function calcMetaDiaria(u){
-  // 1. Primeiro tenta metaDiaria direta (valor mais confiável)
+  var hojeStr = dataISO();
+
+  // 1. Meta gravada no localStorage para hoje
+  var gravada = getMetaGravada(u.login, hojeStr);
+  if(gravada && gravada > 0) return gravada;
+
+  // 2. metaDiaria direto da planilha
   var meta = Math.abs(u.metaDiaria || 0);
   if(meta > 0) return meta;
 
-  // 2. Fallback: calcula pela média dos dias com venda na planilha diária
+  // 3. Saldo ÷ dias úteis restantes
+  var hoje = new Date();
+  var saldo = Math.abs(u.falta || 0);
+  if(saldo <= 0 && u.saldoMetas > 0) saldo = u.saldoMetas;
+  if(saldo > 0){
+    var dr = diasUteisRestantes(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    if(dr > 0) return Math.round(saldo / dr);
+  }
+
+  // 4. Média dos dias com venda
   var dias = vendasDiarias[u.login] || [];
   var diasComVenda = dias.filter(function(d){ return !d.semVenda && d.valor > 0; });
   if(diasComVenda.length >= 3){
-    var mediaDias = diasComVenda.reduce(function(a,d){ return a + d.valor; }, 0) / diasComVenda.length;
-    if(mediaDias > 0) return Math.round(mediaDias);
+    return Math.round(diasComVenda.reduce(function(a,d){ return a+d.valor; },0) / diasComVenda.length);
   }
 
-  // 3. Fallback: (venda + falta) / dias úteis estimados (22)
-  var venda = Math.abs(u.venda || 0);
-  var falta = Math.abs(u.falta || 0);
-  var totalMeta = venda + falta;
-  if(totalMeta > 0){
-    var diasUteis = Math.max(diasComVenda.length, 1);
-    return Math.round(totalMeta / diasUteis);
-  }
+  return 0;
+}
 
-  // 4. Fallback: saldoMetas / 22 dias úteis
-  var saldo = Math.abs(u.saldoMetas || 0);
-  if(saldo > 0) return Math.round(saldo / 22);
-
-  return 0; // sem dados suficientes
+// ── getMetaParaDia: retorna a meta correta para um dia específico no calendário ──
+// Usa histórico gravado se disponível, senão usa metaDiaria da planilha
+function getMetaParaDia(login, dataStr){
+  // dataStr no formato YYYY-MM-DD
+  var gravada = getMetaGravada(login, dataStr);
+  if(gravada && gravada > 0) return gravada;
+  // Fallback: meta atual do usuário
+  var u = usuarios.find(function(x){ return x.login === login; });
+  return u ? Math.abs(u.metaDiaria || 0) : 0;
 }
 
 function getStatus(meta){
@@ -974,7 +1110,9 @@ function abrirPainel(){
   document.getElementById('painel-nome').textContent=u.nome;
   document.getElementById('painel-avatar').textContent=initials(u.nome);
   var ve=document.getElementById('painel-valor');
-  ve.textContent=brl(u.metaDiaria); ve.style.background='linear-gradient(135deg,'+st.color+','+st.color+'aa)';
+  // Usa a meta progressiva calculada/gravada para hoje
+  var metaExibir = calcMetaDiaria(u);
+  ve.textContent=brl(metaExibir); ve.style.background='linear-gradient(135deg,'+st.color+','+st.color+'aa)';
   ve.style.webkitBackgroundClip='text'; ve.style.webkitTextFillColor='transparent';
   document.getElementById('painel-meta-box').style.border='1px solid '+st.color+'30';
   var badge=document.getElementById('painel-badge'); badge.textContent=st.label; badge.style.background=st.bg; badge.style.color=st.color;
@@ -1076,9 +1214,7 @@ async function carregarVersiculo(nome,data){
 function abrirGrafico(){
   var u=usuarioLogado; if(!u) return;
   var dias=vendasDiarias[u.login]||[];
-
-  // ── CORREÇÃO: usa calcMetaDiaria para garantir meta correta ──
-  var meta = calcMetaDiaria(u);
+  var meta = calcMetaDiaria(u); // meta de hoje (para exibição geral)
 
   var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
   var hoje=new Date(); var mesRef=hoje.getMonth(); var anoRef=hoje.getFullYear();
@@ -1086,22 +1222,27 @@ function abrirGrafico(){
   if(prim){var pts=prim.data.split('/');mesRef=parseInt(pts[1],10)-1;}
   window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
 
-  // Mostra qual meta está sendo usada no calendário
+  // Badge informativo
   var metaInfoEl = document.getElementById('cal-meta-info');
   if(metaInfoEl){
-    if(meta > 0){
-      var origem = (u.metaDiaria && Math.abs(u.metaDiaria) > 0) ? 'da planilha' : 'calculada pela média';
-      metaInfoEl.innerHTML = '🎯 Meta diária usada no calendário: <strong>'+brl(meta)+'</strong> <span style="color:#64748b;font-size:11px;">('+origem+')</span>';
-      metaInfoEl.style.display = 'block';
-    } else {
-      metaInfoEl.innerHTML = '⚠️ Meta diária não definida — dias não serão coloridos por meta';
-      metaInfoEl.style.display = 'block';
-    }
+    var gravada = getMetaGravada(u.login, dataISO());
+    var origem = gravada ? 'gravada hoje' : (u.metaDiaria > 0 ? 'da planilha' : 'calculada pelo saldo');
+    metaInfoEl.innerHTML = meta > 0
+      ? '🎯 Meta de hoje: <strong>'+brl(meta)+'</strong> <span style="color:#64748b;font-size:11px;">('+origem+') — cada dia usa sua meta gravada individualmente</span>'
+      : '⚠️ Meta diária não definida — dias não serão coloridos por meta';
+    metaInfoEl.style.display = 'block';
   }
 
+  // Bons/fracos: cada dia compara com SUA meta gravada
   var comV=dias.filter(function(d){return !d.semVenda;});
-  var bons=comV.filter(function(d){return meta>0&&d.valor>=meta;}).length;
-  var fracos=comV.filter(function(d){return meta>0&&d.valor<meta;}).length;
+  var bons=0, fracos=0;
+  comV.forEach(function(d){
+    var pts=d.data.split('/');
+    var isoD = anoRef+'-'+pts[1]+'-'+pts[0];
+    var metaD = getMetaParaDia(u.login, isoD) || meta;
+    if(metaD>0 && d.valor>=metaD) bons++;
+    else if(metaD>0) fracos++;
+  });
   var media=comV.length?comV.reduce(function(a,d){return a+d.valor;},0)/comV.length:0;
   var melhor=comV.reduce(function(a,d){return d.valor>a.valor?d:a;},comV[0]||{valor:0,data:'--'});
   var pior=comV.reduce(function(a,d){return d.valor<a.valor?d:a;},comV[0]||{valor:0,data:'--'});
@@ -1167,8 +1308,13 @@ function renderCalendario(){
   var _tipoBd={'folga':'rgba(34,197,94,0.5)','atestado':'rgba(59,130,246,0.5)','falta-j':'rgba(245,158,11,0.5)','falta-i':'rgba(239,68,68,0.5)','ferias':'rgba(139,92,246,0.5)','compensacao':'rgba(20,184,166,0.5)'};
   var _tipoLabels={'folga':'Folga','atestado':'Atestado','falta-j':'Falta justificada','falta-i':'Falta injustificada','ferias':'Férias','compensacao':'Compensação'};
   for(var b=0;b<prim;b++){var v=document.createElement('div');v.style.cssText='height:44px;border-radius:8px;';grid.appendChild(v);}
+  var uLoginCal = st.u ? st.u.login : (usuarioLogado ? usuarioLogado.login : '');
   for(var d=1;d<=ult;d++){
     var dd=String(d).padStart(2,'0'); var mm=String(mes+1).padStart(2,'0'); var ch=dd+'/'+mm;
+    // ISO do dia para buscar meta gravada individualmente
+    var isoD = ano+'-'+mm+'-'+dd;
+    // Meta do dia: usa a gravada especificamente para aquela data, ou fallback
+    var metaDia = getMetaParaDia(uLoginCal, isoD) || meta;
     var dado=mapa[ch]; var dtD=new Date(ano,mes,d); var ehHj=dtD.toDateString()===hoje.toDateString(); var fut=dtD>hoje;
     var aus=ausMap[ch];
     var cel=document.createElement('div'); cel.style.cssText='height:44px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;';
@@ -1182,22 +1328,16 @@ function renderCalendario(){
       ne.style.color=_cor;
       ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
       if(dado && !dado.semVenda && dado.valor > 0){
-        var corVenda = (meta>0 && dado.valor >= meta) ? '#86efac' : '#fca5a5';
-        ae.textContent = fmtCel(dado.valor);
-        ae.style.color = corVenda;
-        ae.style.fontSize = '8px';
-        ae.style.fontWeight = '700';
-      } else {
-        ae.textContent = aus.motivo ? aus.motivo.slice(0,7) : '';
-        ae.style.color = _cor;
-      }
+        var corVenda = (metaDia>0 && dado.valor >= metaDia) ? '#86efac' : '#fca5a5';
+        ae.textContent = fmtCel(dado.valor); ae.style.color = corVenda; ae.style.fontSize = '8px'; ae.style.fontWeight = '700';
+      } else { ae.textContent = aus.motivo ? aus.motivo.slice(0,7) : ''; ae.style.color = _cor; }
     } else if(fut&&!dado){cel.style.background='rgba(30,41,59,0.3)';ne.style.color='#334155';}
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
     else if(dado.devolucao){cel.style.background='rgba(245,158,11,0.15)';cel.style.border='1px solid rgba(245,158,11,0.4)';ne.style.color='#fbbf24';ve.textContent=fmtCel(dado.valor);ve.style.color='#fde68a';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    // ── CORREÇÃO: comparação usa meta calculada corretamente ──
-    else if(meta>0&&dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else if(meta<=0&&dado.valor>0){cel.style.background='rgba(100,116,139,0.25)';cel.style.border='1px solid rgba(100,116,139,0.4)';ne.style.color='#94a3b8';ve.textContent=fmtCel(dado.valor);ve.style.color='#cbd5e1';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    // Usa metaDia INDIVIDUAL de cada dia para colorir verde/vermelho
+    else if(metaDia>0&&dado.valor>=metaDia){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else if(metaDia<=0&&dado.valor>0){cel.style.background='rgba(100,116,139,0.25)';cel.style.border='1px solid rgba(100,116,139,0.4)';ne.style.color='#94a3b8';ve.textContent=fmtCel(dado.valor);ve.style.color='#cbd5e1';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     if(ehHj) cel.style.boxShadow='0 0 0 2px #f97316';
     (function(ddo,chv,mt,aaus){
@@ -1217,13 +1357,13 @@ function renderCalendario(){
         } else if(!ddo) txt+='<span style="color:#475569;">Sem registro</span>';
         else if(ddo.semVenda) txt+='<span style="color:#64748b;">'+(ddo.motivo==='Fechado'?'🔒 Fechado':ddo.motivo==='Faltou'?'✗ Faltou':'— '+(ddo.motivo||'Sem venda'))+'</span>';
         else if(ddo.devolucao) txt+='↩️ <span style="color:#fbbf24;">Devolução: '+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'');
-        else if(mt>0&&ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta: '+brl(mt)+'</span>';
-        else txt+='📉 <span style="color:#f87171;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#64748b;font-size:11px;">Meta: '+brl(mt)+' (faltou '+brl(mt-ddo.valor)+')</span>';
+        else if(mt>0&&ddo.valor>=mt) txt+='✅ <span style="color:#4ade80;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#475569;font-size:11px;">Meta gravada: '+brl(mt)+'</span>';
+        else txt+='📉 <span style="color:#f87171;">'+brl(ddo.valor)+'</span>'+(ddo.qtd?'<br>👥 '+ddo.qtd+' at.':'')+'<br><span style="color:#64748b;font-size:11px;">Meta gravada: '+brl(mt)+' (faltou '+brl(mt-ddo.valor)+')</span>';
         tip.innerHTML=txt; tip.style.display='block'; tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY-10)+'px';
       });
       cel.addEventListener('mousemove',function(e){var tip=document.getElementById('cal-tooltip');tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';});
       cel.addEventListener('mouseleave',function(){document.getElementById('cal-tooltip').style.display='none';});
-    })(dado,ch,meta,aus);
+    })(dado,ch,metaDia,aus);
     cel.appendChild(ne); cel.appendChild(ve); cel.appendChild(ae); grid.appendChild(cel);
   }
 }
@@ -1239,7 +1379,7 @@ function calcularFaltaAgora(){
   var raw=document.getElementById('calc-input').value.replace(/[Rr$\s]/g,'').replace(/\./g,'').replace(',','.');
   var vendido=parseFloat(raw); var res=document.getElementById('calc-resultado');
   if(isNaN(vendido)||raw===''){res.style.display='none';return;}
-  var meta=u.metaDiaria; var falta=meta-vendido; var pct=Math.min(Math.round((vendido/meta)*100),100);
+  var meta=calcMetaDiaria(u); var falta=meta-vendido; var pct=Math.min(Math.round((vendido/meta)*100),100);
   if(meta<=0) pct=vendido>0?100:0;
   var fEl=document.getElementById('calc-falta'),pEl=document.getElementById('calc-pct'),bEl=document.getElementById('calc-barra'),lEl=document.getElementById('calc-label'),iEl=document.getElementById('calc-input');
   res.style.display='block';
@@ -1255,6 +1395,7 @@ async function abrirAdmin(){
   await carregarDadosGSheets();
   await carregarVendasDiarias();
   document.getElementById('admin-contagem').textContent=usuarios.length+' usuários — '+labelMes();
+  usuarios.forEach(function(u){ gravarERecalcularMeta(u); }); // regrava metas progressivas
   renderTabela(); renderRankingAt(); preencherFiltrosFolgas(); renderFolgas();
   var syncHora = localStorage.getItem('farm-ausencias-sync');
   var syncLabel = document.getElementById('folgas-sync-label');
