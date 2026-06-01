@@ -941,28 +941,27 @@ function gravarERecalcularMeta(u){
   // Só age em dias úteis
   if(!isDiaUtil(anoH, mesH, diaH)) return;
 
-  // Saldo restante = falta para meta (vem da planilha, campo "falta")
-  // Se já tem meta gravada para hoje, usa ela; senão calcula e grava
+  // Se já tem meta gravada para hoje e válida, não recalcula
   var metaHoje = getMetaGravada(u.login, hojeStr);
-  if(!metaHoje || metaHoje <= 0){
+  if(metaHoje && metaHoje > 0) return;
+
+  // Saldo restante = falta para meta (vem da planilha, campo "falta")
+  var saldoRestante = Math.abs(u.falta || 0);
+
+  // Se falta = 0 mas ainda há saldo de metas, usa saldoMetas
+  if(saldoRestante <= 0 && u.saldoMetas > 0) saldoRestante = u.saldoMetas;
+
+  if(saldoRestante > 0){
     // Calcula: saldo ÷ dias úteis restantes (inclui hoje)
-    var saldoRestante = Math.abs(u.falta || 0);
-
-    // Se falta = 0 mas ainda há saldo de metas, usa saldoMetas
-    if(saldoRestante <= 0 && u.saldoMetas > 0) saldoRestante = u.saldoMetas;
-
-    // Se nem isso, tenta metaDiaria direto da planilha
-    if(saldoRestante <= 0 && u.metaDiaria > 0){
-      saldoRestante = u.metaDiaria; // usa direto sem dividir
-      gravarMetaDia(u.login, hojeStr, saldoRestante);
-      return;
-    }
-
     var diasRestantes = diasUteisRestantes(anoH, mesH, diaH);
     if(diasRestantes <= 0) diasRestantes = 1;
-
     metaHoje = Math.round(saldoRestante / diasRestantes);
-    if(metaHoje > 0) gravarMetaDia(u.login, hojeStr, metaHoje);
+    if(metaHoje > 0){ gravarMetaDia(u.login, hojeStr, metaHoje); return; }
+  }
+
+  // Último recurso: usa metaDiaria direto da planilha (também grava para travar o dia)
+  if(u.metaDiaria > 0){
+    gravarMetaDia(u.login, hojeStr, Math.round(Math.abs(u.metaDiaria)));
   }
 }
 
@@ -1016,11 +1015,12 @@ function getStatus(meta){
   if(meta>=0)    return{label:'Você Consegue',color:'#f97316',bg:'rgba(249,115,22,0.12)'};
   return{label:'Você Consegue',color:'#ef4444',bg:'rgba(239,68,68,0.12)'};
 }
-function getStDin(u){
+function getStDin(u, metaRealOpt){
   var venda = u.venda || 0;
   var falta = u.falta || 0;
   var meta = u.saldoMetas || 0;
-  var metaDia = u.metaDiaria || 0;
+  // Usa a meta real calculada se disponível, senão usa metaDiaria bruta como fallback
+  var metaDia = metaRealOpt || u.metaDiaria || 0;
   var semDados = (meta === 0 && venda === 0 && metaDia === 0);
   if(semDados) return{pct:0,label:'— Sem dados',color:'#475569'};
   var pct;
@@ -1034,7 +1034,9 @@ function getStDin(u){
   return{pct:pct,label:'⚠️ Atenção!',color:'#f87171'};
 }
 function barraSt(u){
-  var s=getStDin(u); var pct=Math.min(s.pct,100);
+  // Usa a meta calculada (progressiva/planilha) para a barra de progresso
+  var metaU = calcMetaDiaria(u);
+  var s=getStDin(u, metaU); var pct=Math.min(s.pct,100);
   return '<div style="min-width:130px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;"><span style="font-size:11px;font-weight:700;color:'+s.color+';white-space:nowrap;">'+s.label+'</span><span style="font-size:10px;font-weight:800;color:'+s.color+';margin-left:6px;">'+pct+'%</span></div><div style="height:6px;border-radius:4px;background:rgba(255,255,255,0.08);overflow:hidden;"><div style="height:100%;width:'+pct+'%;border-radius:4px;background:linear-gradient(90deg,'+s.color+'88,'+s.color+');transition:width 0.4s;"></div></div></div>';
 }
 
@@ -1092,8 +1094,10 @@ document.getElementById('inp-admin-senha').addEventListener('keydown',function(e
 // ── PAINEL USUÁRIO ───────────────────────────
 function abrirPainel(){
   var u=usuarioLogado;
-  var stCor=getStatus(u.metaDiaria);
-  var stDin=getStDin(u);
+  // Usa a meta progressiva real (não o campo bruto da planilha) para cor e badge
+  var metaReal = calcMetaDiaria(u);
+  var stCor=getStatus(metaReal);
+  var stDin=getStDin(u, metaReal);
   var st={label:stDin.label, color:stCor.color, bg:stCor.bg};
   if(stDin.label==='— Sem dados') st={label:'— Sem dados',color:'#475569',bg:'rgba(71,85,105,0.12)'};
   var banner=document.getElementById('admin-painel-banner');
@@ -1110,8 +1114,8 @@ function abrirPainel(){
   document.getElementById('painel-nome').textContent=u.nome;
   document.getElementById('painel-avatar').textContent=initials(u.nome);
   var ve=document.getElementById('painel-valor');
-  // Usa a meta progressiva calculada/gravada para hoje
-  var metaExibir = calcMetaDiaria(u);
+  // metaReal já calculada acima (usada em getStatus/getStDin também)
+  var metaExibir = metaReal;
   ve.textContent=brl(metaExibir); ve.style.background='linear-gradient(135deg,'+st.color+','+st.color+'aa)';
   ve.style.webkitBackgroundClip='text'; ve.style.webkitTextFillColor='transparent';
   document.getElementById('painel-meta-box').style.border='1px solid '+st.color+'30';
@@ -1278,6 +1282,14 @@ function calNavegar(delta){
   if(window._calState.mes>11){window._calState.mes=0;window._calState.ano++;}
   if(window._calState.mes<0){window._calState.mes=11;window._calState.ano--;}
   renderCalendario();
+  // Avisa se o mês navegado não tem dados de venda
+  var mes=window._calState.mes; var ano=window._calState.ano;
+  var mm=String(mes+1).padStart(2,'0');
+  var temDados=Object.keys(window._calState.mapa).some(function(k){return k.indexOf('/'+mm)!==-1;});
+  var titulo=document.getElementById('cal-titulo');
+  if(!temDados && titulo){
+    titulo.innerHTML=titulo.textContent+' <span style="font-size:10px;color:#64748b;font-weight:400;">(sem dados)</span>';
+  }
 }
 
 function renderCalendario(){
@@ -1532,14 +1544,16 @@ function getMesAnteriorLabel(){
 function renderTabela(){
   var tbody=document.getElementById('admin-tbody'); tbody.innerHTML='';
   for(var i=0;i<usuarios.length;i++){
-    var u=usuarios[i]; var st=getStDin(u); var login=u.login; var senha=senhaEf(u);
+    var u=usuarios[i];
+    var metaU=calcMetaDiaria(u); // meta real (progressiva ou da planilha)
+    var st=getStDin(u, metaU); var login=u.login; var senha=senhaEf(u);
     var tr=document.createElement('tr');
     tr.innerHTML='<td style="color:#f1f5f9;font-weight:600;max-width:140px;word-break:break-word;">'+u.nome+'</td>'+
       '<td><code class="code-login">'+login+'</code></td>'+
       '<td style="color:#94a3b8;">'+brl(u.saldoMetas)+'</td>'+
       (u.venda?'<td style="color:#34d399;font-weight:700;">'+brl(u.venda)+'</td>':'<td style="color:#475569;">—</td>')+
       '<td style="color:#f87171;font-weight:700;">'+brl(u.falta)+'</td>'+
-      '<td style="font-weight:800;color:'+st.color+';">'+brl(u.metaDiaria)+'</td>'+
+      '<td style="font-weight:800;color:'+st.color+';">'+brl(metaU)+'</td>'+
       '<td>'+barraSt(u)+'</td>'+
       '<td style="display:flex;gap:6px;align-items:center;">'+
         '<button onclick="verPainelAdmin('+i+')" style="background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;" title="Ver painel completo">👁️</button>'+
