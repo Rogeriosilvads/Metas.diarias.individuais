@@ -189,6 +189,7 @@
         <div class="metrica-card"><div class="metrica-label">🎯 Saldo de Metas</div><div class="metrica-valor" id="painel-vendas-brutas">—</div></div>
         <div class="metrica-card"><div class="metrica-label">✅ Venda Realizada</div><div class="metrica-valor" id="painel-deducoes" style="color:#34d399;">—</div></div>
         <div class="metrica-card" style="grid-column:1/-1;"><div class="metrica-label">📉 Falta para Meta</div><div class="metrica-valor" id="painel-resultado" style="color:#f87171;font-size:18px;">—</div></div>
+        <div class="metrica-card" style="grid-column:1/-1;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.2);"><div class="metrica-label">📅 Meta do Dia (Falta ÷ Dias Úteis)</div><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div class="metrica-valor" id="painel-meta-recalculada" style="color:#fed7aa;font-size:20px;">—</div><div id="painel-dias-uteis" style="color:#64748b;font-size:11px;font-weight:600;"></div></div></div>
       </div>
       <div id="card-atendimentos" class="hidden" style="margin-top:12px;background:rgba(249,115,22,0.06);border-radius:14px;padding:18px;border:1px solid rgba(249,115,22,0.18);">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;"><span style="font-size:17px;">👥</span><span style="color:#fed7aa;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">Atendimentos</span></div>
@@ -542,6 +543,7 @@ function detectarColunas(rows){
   var COL_SENHA  = encontrarCol(colMap, ['SENHA','PASS','PASSWORD']);
   var COL_QTD    = encontrarCol(colMap, ['METAQTD','META QTD','QTD META','META QTD DIA']);
   var COL_TICKET = encontrarCol(colMap, ['METATICKET','META TICKET','TICKET META','TICKETMETA']);
+  var COL_DIAS   = encontrarCol(colMap, ['DIAS UTEIS','DIAS ÚTEIS','DIAS UTEIS RESTANTES','DIAS ÚTEIS RESTANTES','DIASUTEIS','DIAS']);
 
   var temVenda = COL_VENDA !== -1;
 
@@ -551,7 +553,7 @@ function detectarColunas(rows){
     var v3 = parseBRL(String(r1[3]||''));
     temVenda = (v2 !== 0 || v3 !== 0);
     return {temVenda: temVenda, posicional: true,
-      C:{nome:0,saldo:1,venda:temVenda?2:-1,falta:temVenda?3:2,meta:temVenda?4:3,login:temVenda?5:4,senha:temVenda?6:5,qtd:temVenda?7:6,ticket:temVenda?8:7}};
+      C:{nome:0,saldo:1,venda:temVenda?2:-1,falta:temVenda?3:2,meta:temVenda?4:3,login:temVenda?5:4,senha:temVenda?6:5,qtd:temVenda?7:6,ticket:temVenda?8:7,dias:temVenda?9:8}};
   }
 
   if(!temVenda && COL_SALDO !== -1 && COL_FALTA !== -1 && COL_FALTA - COL_SALDO === 2){
@@ -569,7 +571,8 @@ function detectarColunas(rows){
     login:  COL_LOGIN  !== -1 ? COL_LOGIN  : (temVenda ? 5 : 4),
     senha:  COL_SENHA  !== -1 ? COL_SENHA  : (temVenda ? 6 : 5),
     qtd:    COL_QTD    !== -1 ? COL_QTD    : (temVenda ? 7 : 6),
-    ticket: COL_TICKET !== -1 ? COL_TICKET : (temVenda ? 8 : 7)
+    ticket: COL_TICKET !== -1 ? COL_TICKET : (temVenda ? 8 : 7),
+    dias:   COL_DIAS   !== -1 ? COL_DIAS   : (temVenda ? 9 : 8)
   }};
 }
 
@@ -652,8 +655,15 @@ async function carregarDadosGSheets(){
 
       var qtd = C.qtd !== -1 ? (Math.round(parseFloat(String(r[C.qtd]||'').replace(/,/g,'.').replace(/[^\d.]/g,''))) || 0) : 0;
       var ticket = C.ticket !== -1 ? parseBRL(String(r[C.ticket]||'')) : 0;
+      // Lê dias úteis da planilha — se não tiver, calcula automaticamente pelos dias restantes do mês
+      var diasRaw = C.dias !== -1 ? Math.round(parseFloat(String(r[C.dias]||'').replace(/,/g,'.').replace(/[^\d.]/g,''))) : 0;
+      var diasUteis = (diasRaw && diasRaw > 0) ? diasRaw : _diasUteisRestantes();
+      // Recalcula meta diária = Falta ÷ Dias Úteis Restantes (quando falta > 0)
+      var metaCalculada = (falta > 0 && diasUteis > 0) ? Math.round(falta / diasUteis) : meta;
 
-      novos.push({nome:nome, saldoMetas:saldo, venda:venda, falta:falta, metaDiaria:meta,
+      novos.push({nome:nome, saldoMetas:saldo, venda:venda, falta:falta,
+                  metaDiaria:metaCalculada, metaDiariaOriginal:meta,
+                  diasUteis:diasUteis,
                   login:loginRaw.toLowerCase(), senha:senhaRaw, metaQtdDia:qtd, metaTicketMeta:ticket});
     }
 
@@ -751,23 +761,39 @@ async function carregarVendasDiarias(){
     var vk = Object.keys(vcm);
     for(var i=prLD; i<rows.length; i++){
       var r = rows[i]; var dc = (r[0]||'').trim(); if(!dc) continue;
-      var mD = dc.match(/^(\d{2}\/\d{2})/);
+      // Aceita DD/MM/AAAA e DD/MM
+      var mD = dc.match(/^(\d{2}\/\d{2})(?:\/\d{2,4})?$/);
+      if(!mD) mD = dc.match(/^(\d{2}\/\d{2})/);
       if(!mD){
         var ser = parseFloat(dc);
         if(!isNaN(ser) && ser>40000 && ser<60000){ dc = excelDdMm(ser); mD = dc.match(/^(\d{2}\/\d{2})/); }
         if(!mD) continue;
       }
       var df = mD[1];
-      var tv = vk.every(function(vc){ var raw=(r[parseInt(vc)]||'').trim(); return !raw||raw==='-'; });
+      // Verifica se TODOS os colaboradores est\u00e3o sem valor (dia fechado)
+      var tv = vk.every(function(vc){ var raw=(r[parseInt(vc)]||'').trim(); return !raw||raw==='-'||raw==='ferias'||raw==='f\u00e9rias'; });
       vk.forEach(function(vc){
         var lg = vcm[vc];
         var rv = (r[parseInt(vc)]||'').trim(); var rq = '';
         Object.keys(qcm).forEach(function(qi){ if(qcm[qi]===lg) rq=(r[parseInt(qi)]||'').trim(); });
+        // Trata "ferias"/"f\u00e9rias" como aus\u00eancia especial
+        if(rv.toLowerCase().replace(/[\u0300-\u036f]/g,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf('ferias')!==-1||
+           rv.toLowerCase().indexOf('f\u00e9rias')!==-1||rv.toLowerCase().indexOf('ferias')!==-1){
+          if(!vendasDiarias[lg]) vendasDiarias[lg]=[];
+          vendasDiarias[lg].push({data:df,valor:0,qtd:0,semVenda:true,motivo:'F\u00e9rias'});
+          return;
+        }
         var val = (!rv||rv==='-') ? null : parseBRL(rv); var qtd = 0;
-        if(rq && rq!=='-'){ var qc=rq.replace(/,/g,'.').replace(/[^\d.]/g,''); var q=Math.round(parseFloat(qc)); if(!isNaN(q)) qtd=q; }
+        // Se valor n\u00e3o parseia mas quantidade parseia, trata como valor=0 com qtd
+        if(val!==null && isNaN(val)){
+          // Tenta usar como quantidade
+          var tryQtd=rv.replace(/,/g,'.').replace(/[^\d.]/g,''); var tq=Math.round(parseFloat(tryQtd));
+          if(!isNaN(tq)&&tq>0){ qtd=tq; val=null; }
+        }
+        if(rq && rq!=='-'){ var qc=rq.replace(/,/g,'.').replace(/[^\d.]/g,''); var q=Math.round(parseFloat(qc)); if(!isNaN(q)&&q>0) qtd=q; }
         if(!vendasDiarias[lg]) vendasDiarias[lg] = [];
         if(tv) vendasDiarias[lg].push({data:df,valor:0,qtd:0,semVenda:true,motivo:'Fechado'});
-        else if(val===null) vendasDiarias[lg].push({data:df,valor:0,qtd:0,semVenda:true,motivo:'Faltou'});
+        else if(val===null) vendasDiarias[lg].push({data:df,valor:0,qtd:qtd,semVenda:true,motivo:qtd>0?'Sem valor':'Faltou'});
         else if(isNaN(val)) vendasDiarias[lg].push({data:df,valor:0,qtd:0,semVenda:true,motivo:'Inválido'});
         else if(val<0) vendasDiarias[lg].push({data:df,valor:Math.abs(val),qtd:qtd,semVenda:false,devolucao:true});
         else if(val===0) vendasDiarias[lg].push({data:df,valor:0,qtd:qtd,semVenda:true,motivo:'Sem venda'});
@@ -940,6 +966,20 @@ function brl(v){ return Number(v).toLocaleString('pt-BR',{style:'currency',curre
 function fmtCel(v){ if(v>=1000) return 'R$'+(v/1000).toFixed(1)+'k'; return 'R$'+Math.round(v); }
 function fmtBR(s){ var p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
 
+// ── CÁLCULO DE DIAS ÚTEIS RESTANTES ──────────────────────────────────────
+// Calcula dias úteis restantes no mês a partir de amanhã (seg a sáb, exceto feriados)
+function _diasUteisRestantes(){
+  var hoje = new Date();
+  var ano = hoje.getFullYear();
+  var mes = hoje.getMonth();
+  var ult = new Date(ano, mes+1, 0).getDate();
+  var n = 0;
+  for(var d = hoje.getDate()+1; d <= ult; d++){
+    if(_isDiaUtil(ano, mes, d)) n++;
+  }
+  return n > 0 ? n : 1; // mínimo 1 para não dividir por zero
+}
+
 // ── CÁLCULO DE META JUSTA POR MÊS ────────────────────────────────────────
 // Feriados nacionais fixos MM-DD
 var _FERIADOS = ['01-01','04-21','05-01','09-07','10-12','11-02','11-15','11-20','12-25'];
@@ -1097,6 +1137,13 @@ function abrirPainel(){
   var badge=document.getElementById('painel-badge'); badge.textContent=st.label; badge.style.background=st.bg; badge.style.color=st.color;
   document.getElementById('painel-vendas-brutas').textContent=brl(u.saldoMetas);
   document.getElementById('painel-resultado').textContent=brl(u.falta);
+  // Card de meta recalculada = Falta ÷ Dias Úteis Restantes
+  var _du = u.diasUteis || _diasUteisRestantes();
+  var _metaRecalc = (u.falta > 0 && _du > 0) ? u.falta / _du : u.metaDiaria;
+  var elMR = document.getElementById('painel-meta-recalculada');
+  var elDU = document.getElementById('painel-dias-uteis');
+  if(elMR) elMR.textContent = brl(_metaRecalc);
+  if(elDU) elDU.textContent = _du + ' dia' + (_du===1?'':'s') + ' útil' + (_du===1?'':'s') + ' restante' + (_du===1?'':'s');
   var cv=document.getElementById('painel-deducoes'); var cvb=cv?cv.closest('.metrica-card'):null;
   if(u.venda!==0){cv.textContent=brl(u.venda);if(cvb)cvb.style.display='';}else{if(cvb)cvb.style.display='none';}
   mostrar('tela-painel');
@@ -1458,7 +1505,7 @@ function renderTabela(){
       '<td style="color:#94a3b8;">'+brl(u.saldoMetas)+'</td>'+
       (u.venda?'<td style="color:#34d399;font-weight:700;">'+brl(u.venda)+'</td>':'<td style="color:#475569;">—</td>')+
       '<td style="color:#f87171;font-weight:700;">'+brl(u.falta)+'</td>'+
-      '<td style="font-weight:800;color:'+st.color+';">'+brl(u.metaDiaria)+'</td>'+
+      '<td style="font-weight:800;color:'+st.color+';" title="Falta ÷ '+(u.diasUteis||_diasUteisRestantes())+' dias úteis">'+brl(u.metaDiaria)+'<span style="font-size:9px;color:#64748b;margin-left:4px;">/'+(u.diasUteis||_diasUteisRestantes())+'d</span></td>'+
       '<td>'+barraSt(u)+'</td>'+
       '<td style="display:flex;gap:6px;align-items:center;">'+
         '<button onclick="verPainelAdmin('+i+')" style="background:rgba(59,130,246,0.18);border:1px solid rgba(59,130,246,0.4);color:#93c5fd;padding:5px 11px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;" title="Ver painel completo">👁️</button>'+
@@ -1512,7 +1559,10 @@ function handleArquivo(e){
         if(/^\d{2}\/\d{2}\/\d{4}\d{2}\/\d{2}\/\d{4}/.test(senhaRaw)){senhaRaw='';}
         var qtd=C.qtd!==-1?(Math.round(parseFloat(String(r[C.qtd]||'').replace(/,/g,'.').replace(/[^\d.]/g,'')))||0):0;
         var ticket=C.ticket!==-1?parseBRL(String(r[C.ticket]||'')):0;
-        novos.push({nome:nome,saldoMetas:saldo,venda:venda,falta:falta,metaDiaria:meta,login:loginRaw.toLowerCase(),senha:senhaRaw,metaQtdDia:qtd,metaTicketMeta:ticket});
+        var diasRawU=C.dias!==-1?Math.round(parseFloat(String(r[C.dias]||'').replace(/,/g,'.').replace(/[^\d.]/g,''))):0;
+        var diasUteisU=(diasRawU&&diasRawU>0)?diasRawU:_diasUteisRestantes();
+        var metaCalcU=(falta>0&&diasUteisU>0)?Math.round(falta/diasUteisU):meta;
+        novos.push({nome:nome,saldoMetas:saldo,venda:venda,falta:falta,metaDiaria:metaCalcU,metaDiariaOriginal:meta,diasUteis:diasUteisU,login:loginRaw.toLowerCase(),senha:senhaRaw,metaQtdDia:qtd,metaTicketMeta:ticket});
       }
       if(novos.length>0){
         usuarios=novos;
