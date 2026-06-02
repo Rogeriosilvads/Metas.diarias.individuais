@@ -1246,14 +1246,49 @@ function calNavegar(delta){
   window._calState.mes+=delta;
   if(window._calState.mes>11){window._calState.mes=0;window._calState.ano++;}
   if(window._calState.mes<0){window._calState.mes=11;window._calState.ano--;}
-  // Atualiza os dados do mês navegado a partir do cache automático
-  if(window._calState.u){
-    var novoDias=getDiasDoMesCalendario(window._calState.u.login,window._calState.ano,window._calState.mes);
+  var novoMes=window._calState.mes; var novoAno=window._calState.ano;
+  var u=window._calState.u;
+  if(!u){renderCalendario();return;}
+  var _nmsC=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var labelNav=_nmsC[novoMes]+' '+novoAno;
+  // Verifica se tem dados no cache
+  var temCache = (vendasDiariasPorMes[labelNav]&&vendasDiariasPorMes[labelNav][u.login]&&vendasDiariasPorMes[labelNav][u.login].length>0);
+  var temHist = (function(){var h=getDadosMes(u.login,labelNav);return h&&h.dias&&h.dias.length>0;})();
+  if(temCache||temHist){
+    var novoDias=getDiasDoMesCalendario(u.login,novoAno,novoMes);
     var novoMapa={}; novoDias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))novoMapa[d.data]=d;});
-    window._calState.dias=novoDias;
-    window._calState.mapa=novoMapa;
+    window._calState.dias=novoDias; window._calState.mapa=novoMapa;
+    renderCalendario();
+  } else {
+    // Não tem cache: busca da planilha em tempo real
+    var mesObj=SHEET_MESES.find(function(m){return m.label===labelNav;});
+    if(!mesObj){renderCalendario();return;} // mês não configurado
+    // Mostra indicador de carregamento no título
+    document.getElementById('cal-titulo').textContent='⏳ Carregando '+labelNav+'...';
+    var mesSalvo=mesSelecionado; var gidSalvo=SHEET_GID_DAILY;
+    mesSelecionado=mesObj.gid; SHEET_GID_DAILY=mesObj.gidVendas;
+    carregarDadosGSheets().then(function(){
+      return carregarVendasDiarias();
+    }).then(function(){
+      // Salva no cache
+      var snap={}; usuarios.forEach(function(uu){snap[uu.login]=(vendasDiarias[uu.login]||[]).slice();});
+      vendasDiariasPorMes[labelNav]=snap; salvarHistoricoMes();
+      // Restaura mês original
+      mesSelecionado=mesSalvo; SHEET_GID_DAILY=gidSalvo;
+      carregarDadosGSheets().then(function(){
+        carregarVendasDiarias();
+        // Atualiza calState com dados recém-carregados
+        var novoDias=(snap[u.login]||[]);
+        var novoMapa={}; novoDias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))novoMapa[d.data]=d;});
+        window._calState.mes=novoMes; window._calState.ano=novoAno;
+        window._calState.dias=novoDias; window._calState.mapa=novoMapa;
+        renderCalendario();
+      });
+    }).catch(function(){
+      mesSelecionado=mesSalvo; SHEET_GID_DAILY=gidSalvo;
+      renderCalendario();
+    });
   }
-  renderCalendario();
 }
 function renderCalendario(){
   var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa;
