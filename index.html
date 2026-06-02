@@ -862,12 +862,71 @@ async function carregarFolgasGitHub(){
   } catch(e){ console.warn('[Ausencias] Erro:', e.message); }
 }
 
+// ── CACHE DE VENDAS POR MÊS ──────────────────
+// Guarda vendasDiarias de cada mês separadamente para o calendário funcionar sem trocar de mês no admin
+var vendasDiariasPorMes = {};
+
+async function carregarVendasDeTodosMeses(){
+  var mesSalvo = mesSelecionado;
+  var gidSalvo = SHEET_GID_DAILY;
+  for(var i = 0; i < SHEET_MESES.length; i++){
+    var m = SHEET_MESES[i];
+    if(!m.gidVendas) continue;
+    try{
+      mesSelecionado = m.gid;
+      SHEET_GID_DAILY = m.gidVendas;
+      // Carrega colaboradores do mês (para ter metaDiaria correta)
+      await carregarDadosGSheets();
+      // Carrega vendas do mês
+      await carregarVendasDiarias();
+      // Salva snapshot desse mês no cache
+      var snapshot = {};
+      usuarios.forEach(function(u){
+        snapshot[u.login] = (vendasDiarias[u.login] || []).slice();
+      });
+      vendasDiariasPorMes[m.label] = snapshot;
+      // Salva no histórico também
+      salvarHistoricoMes();
+      console.log('[Init] Mês '+m.label+' carregado: '+Object.keys(snapshot).length+' colaboradores');
+    } catch(e){
+      console.warn('[Init] Erro ao carregar '+m.label+':', e.message);
+    }
+  }
+  // Restaura o mês atual
+  mesSelecionado = mesSalvo;
+  SHEET_GID_DAILY = gidSalvo;
+  await carregarDadosGSheets();
+  await carregarVendasDiarias();
+  // Atualiza cache do mês atual também
+  var mesAtualLabel = labelMes();
+  var snapshotAtual = {};
+  usuarios.forEach(function(u){
+    snapshotAtual[u.login] = (vendasDiarias[u.login] || []).slice();
+  });
+  vendasDiariasPorMes[mesAtualLabel] = snapshotAtual;
+}
+
+// Sobrescreve vendasDiarias com dados do mês do calendário ao abrir
+function aplicarVendasDoMes(label){
+  if(vendasDiariasPorMes[label]){
+    // Mescla: mantém vendasDiarias atual e substitui apenas pelo mês pedido
+    Object.keys(vendasDiariasPorMes[label]).forEach(function(login){
+      vendasDiarias[login] = vendasDiariasPorMes[label][login];
+    });
+  }
+}
+
 async function init(){
+  // Carrega mês atual primeiro (para login funcionar rápido)
   await carregarDadosGSheets();
   await carregarVendasDiarias();
   carregarAusenciasLS();
   await carregarFolgasGitHub();
   document.getElementById('loading-overlay').style.display='none';
+  // Depois carrega todos os outros meses em background
+  carregarVendasDeTodosMeses().then(function(){
+    console.log('[Init] Todos os meses carregados em background');
+  });
 }
 init();
 
@@ -1131,14 +1190,24 @@ async function carregarVersiculo(nome,data){
 }
 
 // ── CALENDÁRIO ───────────────────────────────
+// ── HELPER: busca dias do mês no cache automático ───────────────────────────
+function getDiasDoMesCalendario(login, ano, mes){
+  var _nms=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var label=_nms[mes]+' '+ano;
+  if(vendasDiariasPorMes[label]&&vendasDiariasPorMes[label][login]) return vendasDiariasPorMes[label][login];
+  var hist=getDadosMes(login,label); if(hist&&hist.dias&&hist.dias.length>0) return hist.dias;
+  return vendasDiarias[login]||[];
+}
+
 function abrirGrafico(){
   var u=usuarioLogado; if(!u) return;
-  var dias=vendasDiarias[u.login]||[];
-  var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
+  // Usa o mês do seletor admin como referência inicial
+  var _nms2=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   var hoje=new Date(); var mesRef=hoje.getMonth(); var anoRef=hoje.getFullYear();
-  var prim=dias.find(function(d){return /^\d{2}\/\d{2}/.test(d.data);});
-  if(prim){var pts=prim.data.split('/');mesRef=parseInt(pts[1],10)-1;}
-  // meta do calendário = saldoMetas ÷ dias úteis do mês (valor uniforme, não recalculado)
+  var partes=labelMes().split(' '); var idx=_nms2.indexOf(partes[0]);
+  if(idx!==-1){mesRef=idx;anoRef=parseInt(partes[1]||anoRef);}
+  var dias=getDiasDoMesCalendario(u.login,anoRef,mesRef);
+  var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
   var meta=metaCalendario(u, anoRef, mesRef);
   window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
   var comV=dias.filter(function(d){return !d.semVenda;});
@@ -1177,11 +1246,17 @@ function calNavegar(delta){
   window._calState.mes+=delta;
   if(window._calState.mes>11){window._calState.mes=0;window._calState.ano++;}
   if(window._calState.mes<0){window._calState.mes=11;window._calState.ano--;}
+  // Atualiza os dados do mês navegado a partir do cache automático
+  if(window._calState.u){
+    var novoDias=getDiasDoMesCalendario(window._calState.u.login,window._calState.ano,window._calState.mes);
+    var novoMapa={}; novoDias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))novoMapa[d.data]=d;});
+    window._calState.dias=novoDias;
+    window._calState.mapa=novoMapa;
+  }
   renderCalendario();
 }
 function renderCalendario(){
   var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa;
-  // Recalcula meta para o mês sendo exibido (pode ser diferente do mês base ao navegar)
   var meta = st.u ? metaCalendario(st.u, ano, mes) : (st.meta || 0);
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('cal-titulo').textContent=meses[mes]+' de '+ano;
@@ -1309,6 +1384,10 @@ async function trocarMes(gid){
   if(mesObj) SHEET_GID_DAILY = mesObj.gidVendas;
   document.getElementById('admin-contagem').textContent='Carregando '+labelMes()+'...';
   await carregarDadosGSheets(); await carregarVendasDiarias();
+  // Atualiza cache do mês recém-carregado
+  var snapshotMes = {};
+  usuarios.forEach(function(u){ snapshotMes[u.login] = (vendasDiarias[u.login]||[]).slice(); });
+  vendasDiariasPorMes[labelMes()] = snapshotMes;
   document.getElementById('admin-contagem').textContent=usuarios.length+' usuários — '+labelMes();
   renderTabela(); renderRankingAt(); preencherFiltrosFolgas(); renderFolgas();
   salvarHistoricoMes(); preencherSeletoresDesempenho(); renderDesempenho();
