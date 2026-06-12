@@ -185,10 +185,39 @@
         <div id="painel-valor" style="font-size:48px;font-weight:800;letter-spacing:-2px;margin-bottom:12px;"></div>
         <span id="painel-badge" class="badge" style="padding:5px 14px;font-size:12px;"></span>
       </div>
+      <!-- Card de andamento do dia atual -->
+      <div id="card-venda-hoje" style="display:none;background:rgba(8,28,28,0.65);border-radius:16px;padding:18px 20px;margin-bottom:16px;border:1px solid rgba(52,211,153,0.25);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <span style="color:#34d399;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;">📈 Andamento de Hoje</span>
+          <span id="hoje-data-label" style="color:#475569;font-size:11px;font-weight:600;"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div style="background:rgba(52,211,153,0.08);border-radius:10px;padding:12px;border:1px solid rgba(52,211,153,0.2);">
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">💰 Venda de Hoje</div>
+            <div id="hoje-venda" style="font-size:20px;font-weight:800;color:#34d399;">—</div>
+          </div>
+          <div style="background:rgba(249,115,22,0.08);border-radius:10px;padding:12px;border:1px solid rgba(249,115,22,0.2);">
+            <div style="color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">🎯 Meta do Dia</div>
+            <div id="hoje-meta" style="font-size:20px;font-weight:800;color:#fed7aa;">—</div>
+          </div>
+        </div>
+        <!-- Barra de progresso -->
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span id="hoje-status-label" style="font-size:12px;font-weight:700;"></span>
+            <span id="hoje-pct" style="font-size:13px;font-weight:800;color:#34d399;"></span>
+          </div>
+          <div style="background:rgba(71,85,105,0.3);border-radius:999px;height:10px;overflow:hidden;">
+            <div id="hoje-barra" style="height:10px;border-radius:999px;background:linear-gradient(90deg,#34d399,#10b981);transition:width 0.6s ease;width:0%;"></div>
+          </div>
+        </div>
+        <div id="hoje-falta-label" style="color:#94a3b8;font-size:11px;text-align:center;margin-top:4px;"></div>
+      </div>
+
       <div class="metricas-grid">
         <div class="metrica-card"><div class="metrica-label">🎯 Saldo de Metas</div><div class="metrica-valor" id="painel-vendas-brutas">—</div></div>
         <div class="metrica-card"><div class="metrica-label">✅ Venda Realizada</div><div class="metrica-valor" id="painel-deducoes" style="color:#34d399;">—</div></div>
-        <div class="metrica-card" style="grid-column:1/-1;"><div class="metrica-label">📉 Falta para Meta</div><div class="metrica-valor" id="painel-resultado" style="color:#f87171;font-size:18px;">—</div></div>
+        <div class="metrica-card" style="grid-column:1/-1;"><div class="metrica-label">📉 Falta para Meta Mensal</div><div class="metrica-valor" id="painel-resultado" style="color:#f87171;font-size:18px;">—</div></div>
         <div class="metrica-card" style="grid-column:1/-1;background:rgba(249,115,22,0.06);border:1px solid rgba(249,115,22,0.2);"><div class="metrica-label">📅 Meta do Dia (Falta ÷ Dias Úteis)</div><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><div class="metrica-valor" id="painel-meta-recalculada" style="color:#fed7aa;font-size:20px;">—</div><div id="painel-dias-uteis" style="color:#64748b;font-size:11px;font-weight:600;"></div></div></div>
       </div>
       <div id="card-atendimentos" class="hidden" style="margin-top:12px;background:rgba(249,115,22,0.06);border-radius:14px;padding:18px;border:1px solid rgba(249,115,22,0.18);">
@@ -1147,6 +1176,61 @@ function abrirPainel(){
   if(elDU) elDU.textContent = _du + ' dia' + (_du===1?'':'s') + ' útil' + (_du===1?'':'s') + ' restante' + (_du===1?'':'s');
   var cv=document.getElementById('painel-deducoes'); var cvb=cv?cv.closest('.metrica-card'):null;
   if(u.venda!==0){cv.textContent=brl(u.venda);if(cvb)cvb.style.display='';}else{if(cvb)cvb.style.display='none';}
+  // ── ANDAMENTO DO DIA ATUAL ────────────────────────────────────────────────
+  (function(){
+    var diasU = vendasDiarias[u.login] || [];
+    var hoje = new Date();
+    var hojeDD = String(hoje.getDate()).padStart(2,'0') + '/' + String(hoje.getMonth()+1).padStart(2,'0');
+    var dadoHoje = diasU.find(function(d){ return d.data === hojeDD; });
+    var cardHoje = document.getElementById('card-venda-hoje');
+    var metaDia = _metaRecalc > 0 ? _metaRecalc : u.metaDiaria;
+    if(dadoHoje && !dadoHoje.semVenda){
+      cardHoje.style.display = 'block';
+      var vendaHj = dadoHoje.valor;
+      var pct = metaDia > 0 ? Math.min(Math.round((vendaHj / metaDia) * 100), 100) : 0;
+      var bateu = vendaHj >= metaDia;
+      document.getElementById('hoje-data-label').textContent = hojeDD + '/' + String(hoje.getFullYear());
+      document.getElementById('hoje-venda').textContent = brl(vendaHj);
+      document.getElementById('hoje-meta').textContent = brl(metaDia);
+      var barra = document.getElementById('hoje-barra');
+      barra.style.width = pct + '%';
+      barra.style.background = bateu ? 'linear-gradient(90deg,#34d399,#10b981)' : pct >= 70 ? 'linear-gradient(90deg,#f59e0b,#f97316)' : 'linear-gradient(90deg,#f87171,#ef4444)';
+      document.getElementById('hoje-pct').textContent = pct + '%';
+      document.getElementById('hoje-pct').style.color = bateu ? '#34d399' : pct >= 70 ? '#fbbf24' : '#f87171';
+      if(bateu){
+        document.getElementById('hoje-status-label').textContent = '🎉 Meta batida!';
+        document.getElementById('hoje-status-label').style.color = '#34d399';
+        document.getElementById('hoje-falta-label').textContent = 'Parabéns! Você superou a meta do dia em ' + brl(vendaHj - metaDia);
+      } else {
+        var faltaHj = metaDia - vendaHj;
+        document.getElementById('hoje-status-label').textContent = 'Em andamento';
+        document.getElementById('hoje-status-label').style.color = '#fbbf24';
+        document.getElementById('hoje-falta-label').textContent = 'Falta ' + brl(faltaHj) + ' para bater a meta de hoje';
+      }
+    } else if(dadoHoje && dadoHoje.semVenda){
+      cardHoje.style.display = 'block';
+      document.getElementById('hoje-data-label').textContent = hojeDD;
+      document.getElementById('hoje-venda').textContent = dadoHoje.motivo || '—';
+      document.getElementById('hoje-meta').textContent = brl(metaDia);
+      document.getElementById('hoje-barra').style.width = '0%';
+      document.getElementById('hoje-pct').textContent = '0%';
+      document.getElementById('hoje-status-label').textContent = dadoHoje.motivo || 'Sem venda';
+      document.getElementById('hoje-status-label').style.color = '#94a3b8';
+      document.getElementById('hoje-falta-label').textContent = '';
+    } else {
+      // Ainda sem dado de hoje (dia ainda não registrado)
+      cardHoje.style.display = 'block';
+      document.getElementById('hoje-data-label').textContent = hojeDD;
+      document.getElementById('hoje-venda').textContent = 'Aguardando';
+      document.getElementById('hoje-meta').textContent = brl(metaDia);
+      document.getElementById('hoje-barra').style.width = '0%';
+      document.getElementById('hoje-pct').textContent = '—';
+      document.getElementById('hoje-status-label').textContent = 'Venda de hoje ainda não registrada';
+      document.getElementById('hoje-status-label').style.color = '#475569';
+      document.getElementById('hoje-falta-label').textContent = 'Meta do dia: ' + brl(metaDia);
+    }
+  })();
+  // ─────────────────────────────────────────────────────────────────────────
   mostrar('tela-painel');
   carregarVersiculo(u.nome,dataISO());
   var diasU=vendasDiarias[u.login]||[];
