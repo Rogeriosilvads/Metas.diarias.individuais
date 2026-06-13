@@ -941,7 +941,7 @@ async function carregarVendasDeTodosMeses(){
       var snapMeta = {};
       usuarios.forEach(function(u){
         snapshot[u.login] = (vendasDiarias[u.login] || []).slice();
-        snapMeta[u.login] = u.metaDiaria || 0;
+        snapMeta[u.login] = {metaDiaria: u.metaDiaria||0, saldoMetas: u.saldoMetas||0};
       });
       vendasDiariasPorMes[m.label] = snapshot;
       metaDiariaPorMes[m.label] = snapMeta;
@@ -963,7 +963,7 @@ async function carregarVendasDeTodosMeses(){
   var snapMetaAtual = {};
   usuarios.forEach(function(u){
     snapshotAtual[u.login] = (vendasDiarias[u.login] || []).slice();
-    snapMetaAtual[u.login] = u.metaDiaria || 0;
+    snapMetaAtual[u.login] = {metaDiaria: u.metaDiaria||0, saldoMetas: u.saldoMetas||0};
   });
   vendasDiariasPorMes[mesAtualLabel] = snapshotAtual;
   metaDiariaPorMes[mesAtualLabel] = snapMetaAtual;
@@ -1048,14 +1048,23 @@ function _diasUteisNoMes(ano,mes){
 // Isso evita que a meta recalculada no final do mês distorça o calendário.
 // Para o painel do dia atual usa metaDiaria da planilha (mais precisa).
 function metaCalendario(u, ano, mes, label){
-  // Busca metaDiaria do mês específico do calendário (não o mês atual)
-  // Cada mês tem sua própria metaDiaria calculada na planilha mensal (falta ÷ dias úteis restantes)
+  // Retorna metaDiaria snapshot do mês (para fallback quando _metaPorDia não existe)
   var lbl = label || (window._calState && window._calState.label) || labelMes();
-  if(metaDiariaPorMes[lbl] && metaDiariaPorMes[lbl][u.login] !== undefined){
-    return Math.abs(metaDiariaPorMes[lbl][u.login]);
-  }
-  // Fallback: se é o mês atual usa metaDiaria em tempo real
+  var snap = metaDiariaPorMes[lbl] && metaDiariaPorMes[lbl][u.login];
+  if(snap && typeof snap === 'object') return Math.abs(snap.metaDiaria || 0);
+  if(snap && typeof snap === 'number') return Math.abs(snap);
   return Math.abs(u.metaDiaria || 0);
+}
+function saldoMetasCalendario(u, ano, mes, label){
+  // Retorna saldoMetas snapshot do mês para calcular meta dinâmica por dia
+  var lbl = label || (window._calState && window._calState.label) || labelMes();
+  var snap = metaDiariaPorMes[lbl] && metaDiariaPorMes[lbl][u.login];
+  if(snap && typeof snap === 'object' && snap.saldoMetas > 0) return Math.abs(snap.saldoMetas);
+  // Fallback para mês atual
+  if(lbl === labelMes()) return Math.abs(u.saldoMetas || 0);
+  // Último recurso: metaDiaria * dias úteis do mês
+  var md = metaCalendario(u, ano, mes, lbl);
+  return md * _diasUteisNoMes(ano, mes);
 }
 
 function mostrarToast(msg,cor){
@@ -1418,7 +1427,7 @@ function calNavegar(delta){
       var snap={}; var snapMeta2={}; 
       usuarios.forEach(function(uu){
         snap[uu.login]=(vendasDiarias[uu.login]||[]).slice();
-        snapMeta2[uu.login]=uu.metaDiaria||0;
+        snapMeta2[uu.login]={metaDiaria:uu.metaDiaria||0,saldoMetas:uu.saldoMetas||0};
       });
       vendasDiariasPorMes[labelNav]=snap; metaDiariaPorMes[labelNav]=snapMeta2; salvarHistoricoMes();
       // Restaura mês original
@@ -1442,7 +1451,36 @@ function calNavegar(delta){
 }
 function renderCalendario(){
   var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa;
-  var meta = st.u ? metaCalendario(st.u, ano, mes, st.label) : (st.meta || 0);
+  // ── META DINÂMICA POR DIA ────────────────────────────────────────────────
+  // A meta de cada dia = saldo restante ÷ dias úteis restantes A PARTIR daquele dia
+  // Lógica: se meta=5, vendeu 0 em 6 dias restantes → meta=0,83/dia
+  //         se não vendeu → saldo continua, dias restantes diminuem → meta sobe
+  // Busca saldoMetas do mês do calendário (snapshot correto por mês)
+  var _saldoMetasMes = st.u ? saldoMetasCalendario(st.u, ano, mes, st.label) : (st.meta || 0);
+  // Monta lista de todos os dias úteis do mês em ordem
+  var _diasUteisMes = [];
+  var _ultDia = new Date(ano, mes+1, 0).getDate();
+  for(var _d=1; _d<=_ultDia; _d++){
+    var _dd=String(_d).padStart(2,'0'); var _mm=String(mes+1).padStart(2,'0');
+    if(_isDiaUtil(ano, mes, _d)) _diasUteisMes.push(_dd+'/'+_mm);
+  }
+  // Calcula meta de cada dia útil dinamicamente (acumulando vendas dos dias anteriores)
+  var _metaPorDia = {};
+  var _vendidoAcum = 0;
+  for(var _i=0; _i<_diasUteisMes.length; _i++){
+    var _chDia = _diasUteisMes[_i];
+    var _falta = _saldoMetasMes - _vendidoAcum;
+    if(_falta < 0) _falta = 0;
+    var _diasRest = _diasUteisMes.length - _i;
+    _metaPorDia[_chDia] = _diasRest > 0 ? _falta / _diasRest : 0;
+    // Acumula venda deste dia se existir
+    var _dadoDia = mapa[_chDia];
+    if(_dadoDia && !_dadoDia.semVenda && _dadoDia.valor > 0 && !_dadoDia.devolucao){
+      _vendidoAcum += _dadoDia.valor;
+    }
+  }
+  // meta fixo para compatibilidade com código não-dinâmico abaixo
+  var meta = st.u ? (metaCalendario(st.u, ano, mes, st.label)) : (st.meta || 0);
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('cal-titulo').textContent=meses[mes]+' de '+ano;
   var grid=document.getElementById('cal-grid'); grid.innerHTML='';
@@ -1481,7 +1519,7 @@ function renderCalendario(){
       ne.style.color=_cor;
       ve.textContent=_tipoIcons[aus.tipo]||'📅'; ve.style.fontSize='11px';
       if(dado && !dado.semVenda && dado.valor > 0){
-        var corVenda = dado.valor >= meta ? '#86efac' : '#fca5a5';
+        var _mtDia = _metaPorDia[ch] || meta; var corVenda = dado.valor >= _mtDia ? '#86efac' : '#fca5a5';
         ae.textContent = fmtCel(dado.valor);
         ae.style.color = corVenda;
         ae.style.fontSize = '8px';
@@ -1494,7 +1532,7 @@ function renderCalendario(){
     else if(!dado){cel.style.background='rgba(30,41,59,0.5)';cel.style.border='1px solid rgba(51,65,85,0.4)';ne.style.color='#334155';}
     else if(dado.semVenda){var ic=dado.motivo==='Fechado'?'🔒':dado.motivo==='Faltou'?'✗':'—';cel.style.background='rgba(51,65,85,0.6)';cel.style.border='1px solid rgba(71,85,105,0.5)';ne.style.color='#64748b';ve.textContent=ic;ve.style.fontSize='9px';}
     else if(dado.devolucao){cel.style.background='rgba(245,158,11,0.15)';cel.style.border='1px solid rgba(245,158,11,0.4)';ne.style.color='#fbbf24';ve.textContent=fmtCel(dado.valor);ve.style.color='#fde68a';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
-    else if(dado.valor>=meta){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
+    else if(dado.valor>=(_metaPorDia[ch]||meta)){cel.style.background='rgba(34,197,94,0.2)';cel.style.border='1px solid rgba(34,197,94,0.5)';ne.style.color='#4ade80';ve.textContent=fmtCel(dado.valor);ve.style.color='#86efac';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     else{cel.style.background='rgba(239,68,68,0.15)';cel.style.border='1px solid rgba(239,68,68,0.4)';ne.style.color='#f87171';ve.textContent=fmtCel(dado.valor);ve.style.color='#fca5a5';ae.textContent=dado.qtd?dado.qtd+' at.':'';}
     if(ehHj) cel.style.boxShadow='0 0 0 2px #f97316';
     (function(ddo,chv,mt,aaus){
@@ -1520,7 +1558,7 @@ function renderCalendario(){
       });
       cel.addEventListener('mousemove',function(e){var tip=document.getElementById('cal-tooltip');tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-10)+'px';});
       cel.addEventListener('mouseleave',function(){document.getElementById('cal-tooltip').style.display='none';});
-    })(dado,ch,meta,aus);
+    })(dado,ch,(_metaPorDia[ch]||meta),aus);
     cel.appendChild(ne); cel.appendChild(ve); cel.appendChild(ae); grid.appendChild(cel);
   }
 }
