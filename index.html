@@ -23,7 +23,8 @@
     .orb { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%); transform: translate(-50%, -50%); }
     .tela { position: relative; z-index: 1; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.35s ease; }
     #tela-login { background: #029ca8 !important; }
-    .tela-admin { position: relative; z-index: 1; min-height: 100vh; padding: 24px; animation: fadeIn 0.35s ease; }
+    #tela-painel > *:not(:first-child), #tela-admin > *:not(:first-child) { position: relative; z-index: 1; }
+    .tela-admin { position: relative; min-height: 100vh; padding: 24px; animation: fadeIn 0.35s ease; }
     .card { background: rgba(10,32,32,0.85); backdrop-filter: blur(20px); border: 1px solid rgba(249,115,22,0.2); border-radius: 20px; padding: 32px; box-shadow: 0 25px 60px rgba(0,0,0,0.4); }
     .btn-primary { width: 100%; padding: 14px; border-radius: 10px; border: none; background: linear-gradient(135deg, #f97316, #ea580c); color: white; font-size: 15px; font-weight: 700; box-shadow: 0 4px 20px rgba(249,115,22,0.4); letter-spacing: 0.5px; transition: opacity 0.2s; }
     .btn-primary:hover { opacity: 0.9; }
@@ -159,7 +160,30 @@
 </div>
 
 <!-- PAINEL USUÁRIO -->
-<div id="tela-painel" class="tela hidden">
+<div id="tela-painel" class="tela hidden" style="background:#029ca8;min-height:100vh;">
+  <div style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;">
+    <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,0.06);"></div>
+    <div style="position:absolute;top:30px;left:20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="position:absolute;bottom:40px;right:-40px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+    <div style="position:absolute;bottom:120px;right:30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <svg style="position:absolute;top:50%;left:-30px;transform:translateY(-50%);opacity:0.06;" width="200" height="200" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+    <svg style="position:absolute;top:10%;right:-20px;opacity:0.05;" width="180" height="180" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+    <svg style="position:absolute;bottom:60px;right:10px;opacity:0.10;" width="180" height="180" viewBox="0 0 180 180">
+      <circle cx="180" cy="180" r="60" fill="none" stroke="#f59e0b" stroke-width="2"/>
+      <circle cx="180" cy="180" r="90" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+      <circle cx="180" cy="180" r="120" fill="none" stroke="#f59e0b" stroke-width="1"/>
+    </svg>
+    <svg style="position:absolute;top:20px;right:15%;opacity:0.04;" width="150" height="150" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+  </div>
   <div style="width:100%;max-width:460px;">
     <div id="admin-painel-banner" style="display:none;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.35);border-radius:12px;padding:10px 16px;margin-bottom:16px;align-items:center;justify-content:space-between;gap:12px;">
       <span style="color:#93c5fd;font-size:12px;font-weight:700;">👁️ Visão Admin — <span id="admin-banner-nome"></span></span>
@@ -362,7 +386,30 @@
 </div>
 
 <!-- ADMIN -->
-<div id="tela-admin" class="tela-admin hidden">
+<div id="tela-admin" class="tela-admin hidden" style="background:#029ca8;min-height:100vh;">
+  <div style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;">
+    <div style="position:absolute;top:-60px;left:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,0.06);"></div>
+    <div style="position:absolute;top:30px;left:20px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <div style="position:absolute;bottom:40px;right:-40px;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
+    <div style="position:absolute;bottom:120px;right:30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,0.04);"></div>
+    <svg style="position:absolute;top:50%;left:-30px;transform:translateY(-50%);opacity:0.06;" width="200" height="200" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+    <svg style="position:absolute;top:10%;right:-20px;opacity:0.05;" width="180" height="180" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+    <svg style="position:absolute;bottom:60px;right:10px;opacity:0.10;" width="180" height="180" viewBox="0 0 180 180">
+      <circle cx="180" cy="180" r="60" fill="none" stroke="#f59e0b" stroke-width="2"/>
+      <circle cx="180" cy="180" r="90" fill="none" stroke="#f59e0b" stroke-width="1.5"/>
+      <circle cx="180" cy="180" r="120" fill="none" stroke="#f59e0b" stroke-width="1"/>
+    </svg>
+    <svg style="position:absolute;top:20px;right:15%;opacity:0.04;" width="150" height="150" viewBox="0 0 100 100">
+      <rect x="35" y="10" width="30" height="80" rx="8" fill="white"/>
+      <rect x="10" y="35" width="80" height="30" rx="8" fill="white"/>
+    </svg>
+  </div>
   <div style="max-width:100%;margin:0 auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:28px;">
       <div><h1 style="color:#f1f5f9;font-size:24px;margin:0 0 4px;font-weight:800;">🛠️ Painel Administrador</h1><p id="admin-contagem" style="color:#64748b;font-size:13px;margin:0;"></p></div>
