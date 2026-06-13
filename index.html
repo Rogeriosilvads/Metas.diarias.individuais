@@ -1041,10 +1041,8 @@ function _diasUteisNoMes(ano,mes){
 // Isso evita que a meta recalculada no final do mês distorça o calendário.
 // Para o painel do dia atual usa metaDiaria da planilha (mais precisa).
 function metaCalendario(u, ano, mes){
-  if(u.saldoMetas && u.saldoMetas > 0){
-    var du = _diasUteisNoMes(ano, mes);
-    if(du > 0) return Math.round(u.saldoMetas / du);
-  }
+  // Usa metaDiaria já calculada corretamente na planilha mensal (falta ÷ dias úteis RESTANTES)
+  // A lógica antiga dividia saldoMetas por _diasUteisNoMes (mês inteiro) → valor fixo errado
   return Math.abs(u.metaDiaria || 0);
 }
 
