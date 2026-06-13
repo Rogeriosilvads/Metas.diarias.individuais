@@ -1574,7 +1574,11 @@ function calcularFaltaAgora(){
   var raw=document.getElementById('calc-input').value.replace(/[Rr$\s]/g,'').replace(/\./g,'').replace(',','.');
   var vendido=parseFloat(raw); var res=document.getElementById('calc-resultado');
   if(isNaN(vendido)||raw===''){res.style.display='none';return;}
-  var meta=u.metaDiaria; var falta=meta-vendido; var pct=Math.min(Math.round((vendido/meta)*100),100);
+  // Usa meta recalculada (falta ÷ dias úteis restantes), igual ao painel principal
+  var _du=u.diasUteis||_diasUteisRestantes();
+  var meta=(_du>0&&u.falta>0)?u.falta/_du:u.metaDiaria;
+  if(meta<=0) meta=u.metaDiaria;
+  var falta=meta-vendido; var pct=Math.min(Math.round((vendido/meta)*100),100);
   if(meta<=0) pct=vendido>0?100:0;
   var fEl=document.getElementById('calc-falta'),pEl=document.getElementById('calc-pct'),bEl=document.getElementById('calc-barra'),lEl=document.getElementById('calc-label'),iEl=document.getElementById('calc-input');
   res.style.display='block';
