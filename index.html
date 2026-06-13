@@ -921,6 +921,7 @@ async function carregarFolgasGitHub(){
 // ── CACHE DE VENDAS POR MÊS ──────────────────
 // Guarda vendasDiarias de cada mês separadamente para o calendário funcionar sem trocar de mês no admin
 var vendasDiariasPorMes = {};
+var metaDiariaPorMes = {}; // snapshot de metaDiaria de cada usuário por mês
 
 async function carregarVendasDeTodosMeses(){
   var mesSalvo = mesSelecionado;
@@ -937,10 +938,13 @@ async function carregarVendasDeTodosMeses(){
       await carregarVendasDiarias();
       // Salva snapshot desse mês no cache
       var snapshot = {};
+      var snapMeta = {};
       usuarios.forEach(function(u){
         snapshot[u.login] = (vendasDiarias[u.login] || []).slice();
+        snapMeta[u.login] = u.metaDiaria || 0;
       });
       vendasDiariasPorMes[m.label] = snapshot;
+      metaDiariaPorMes[m.label] = snapMeta;
       // Salva no histórico também
       salvarHistoricoMes();
       console.log('[Init] Mês '+m.label+' carregado: '+Object.keys(snapshot).length+' colaboradores');
@@ -956,10 +960,13 @@ async function carregarVendasDeTodosMeses(){
   // Atualiza cache do mês atual também
   var mesAtualLabel = labelMes();
   var snapshotAtual = {};
+  var snapMetaAtual = {};
   usuarios.forEach(function(u){
     snapshotAtual[u.login] = (vendasDiarias[u.login] || []).slice();
+    snapMetaAtual[u.login] = u.metaDiaria || 0;
   });
   vendasDiariasPorMes[mesAtualLabel] = snapshotAtual;
+  metaDiariaPorMes[mesAtualLabel] = snapMetaAtual;
 }
 
 // Sobrescreve vendasDiarias com dados do mês do calendário ao abrir
@@ -1040,9 +1047,14 @@ function _diasUteisNoMes(ano,mes){
 // Usa saldoMetas ÷ dias úteis do mês como referência uniforme.
 // Isso evita que a meta recalculada no final do mês distorça o calendário.
 // Para o painel do dia atual usa metaDiaria da planilha (mais precisa).
-function metaCalendario(u, ano, mes){
-  // Usa metaDiaria já calculada corretamente na planilha mensal (falta ÷ dias úteis RESTANTES)
-  // A lógica antiga dividia saldoMetas por _diasUteisNoMes (mês inteiro) → valor fixo errado
+function metaCalendario(u, ano, mes, label){
+  // Busca metaDiaria do mês específico do calendário (não o mês atual)
+  // Cada mês tem sua própria metaDiaria calculada na planilha mensal (falta ÷ dias úteis restantes)
+  var lbl = label || (window._calState && window._calState.label) || labelMes();
+  if(metaDiariaPorMes[lbl] && metaDiariaPorMes[lbl][u.login] !== undefined){
+    return Math.abs(metaDiariaPorMes[lbl][u.login]);
+  }
+  // Fallback: se é o mês atual usa metaDiaria em tempo real
   return Math.abs(u.metaDiaria || 0);
 }
 
@@ -1338,8 +1350,8 @@ function abrirGrafico(){
   if(idx!==-1){mesRef=idx;anoRef=parseInt(partes[1]||anoRef);}
   var dias=getDiasDoMesCalendario(u.login,anoRef,mesRef);
   var mapaV={}; dias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))mapaV[d.data]=d;});
-  var meta=metaCalendario(u, anoRef, mesRef);
-  window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias};
+  var meta=metaCalendario(u, anoRef, mesRef, labelMes());
+  window._calState={mes:mesRef,ano:anoRef,mapa:mapaV,meta:meta,u:u,dias:dias,label:labelMes()};
   var comV=dias.filter(function(d){return !d.semVenda;});
   var bons=comV.filter(function(d){return d.valor>=meta;}).length;
   var fracos=comV.filter(function(d){return d.valor<meta;}).length;
@@ -1388,6 +1400,8 @@ function calNavegar(delta){
     var novoDias=getDiasDoMesCalendario(u.login,novoAno,novoMes);
     var novoMapa={}; novoDias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))novoMapa[d.data]=d;});
     window._calState.dias=novoDias; window._calState.mapa=novoMapa;
+    window._calState.label=labelNav;
+    window._calState.meta=metaCalendario(u,novoAno,novoMes,labelNav);
     renderCalendario();
   } else {
     // Não tem cache: busca da planilha em tempo real
@@ -1401,8 +1415,12 @@ function calNavegar(delta){
       return carregarVendasDiarias();
     }).then(function(){
       // Salva no cache
-      var snap={}; usuarios.forEach(function(uu){snap[uu.login]=(vendasDiarias[uu.login]||[]).slice();});
-      vendasDiariasPorMes[labelNav]=snap; salvarHistoricoMes();
+      var snap={}; var snapMeta2={}; 
+      usuarios.forEach(function(uu){
+        snap[uu.login]=(vendasDiarias[uu.login]||[]).slice();
+        snapMeta2[uu.login]=uu.metaDiaria||0;
+      });
+      vendasDiariasPorMes[labelNav]=snap; metaDiariaPorMes[labelNav]=snapMeta2; salvarHistoricoMes();
       // Restaura mês original
       mesSelecionado=mesSalvo; SHEET_GID_DAILY=gidSalvo;
       carregarDadosGSheets().then(function(){
@@ -1412,6 +1430,8 @@ function calNavegar(delta){
         var novoMapa={}; novoDias.forEach(function(d){if(/^\d{2}\/\d{2}/.test(d.data))novoMapa[d.data]=d;});
         window._calState.mes=novoMes; window._calState.ano=novoAno;
         window._calState.dias=novoDias; window._calState.mapa=novoMapa;
+        window._calState.label=labelNav;
+        window._calState.meta=metaCalendario(u,novoMes,novoAno,labelNav);
         renderCalendario();
       });
     }).catch(function(){
@@ -1422,7 +1442,7 @@ function calNavegar(delta){
 }
 function renderCalendario(){
   var st=window._calState; var mes=st.mes; var ano=st.ano; var mapa=st.mapa;
-  var meta = st.u ? metaCalendario(st.u, ano, mes) : (st.meta || 0);
+  var meta = st.u ? metaCalendario(st.u, ano, mes, st.label) : (st.meta || 0);
   var meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   document.getElementById('cal-titulo').textContent=meses[mes]+' de '+ano;
   var grid=document.getElementById('cal-grid'); grid.innerHTML='';
