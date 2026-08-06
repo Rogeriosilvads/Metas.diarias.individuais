@@ -1748,8 +1748,12 @@ function handleArquivo(e){
         var meta=parseBRL(String(r[C.meta]||''));
         var loginRaw=C.login!==-1?String(r[C.login]||'').trim():'';
         var senhaRaw=C.senha!==-1?String(r[C.senha]||'').trim():'';
-        if(/^\d{2}\/\d{2}(\/\d{2,4})?$/.test(loginRaw)||/^\d{5,}$/.test(loginRaw)||!loginRaw){
-          loginRaw=nome.trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        var loginValidoUp = loginRaw &&
+  /^[a-zA-Z\u00C0-\u00FF][a-zA-Z\u00C0-\u00FF0-9._-]{1,29}$/.test(loginRaw) &&
+  loginRaw.toUpperCase().indexOf('R$') === -1;
+if(!loginValidoUp){
+  loginRaw=nome.trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
         }
         if(/^\d{2}\/\d{2}\/\d{4}\d{2}\/\d{2}\/\d{4}/.test(senhaRaw)){senhaRaw='';}
         var qtd=C.qtd!==-1?(Math.round(parseFloat(String(r[C.qtd]||'').replace(/,/g,'.').replace(/[^\d.]/g,'')))||0):0;
