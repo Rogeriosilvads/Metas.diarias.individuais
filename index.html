@@ -526,7 +526,7 @@ var SHEET_MESES = [
   {label:"Maio 2026",     gid:"0",          gidVendas:"0"},
   {label:"Junho 2026",    gid:"1863138000", gidVendas:"279006968"},
   {label:"Julho 2026",    gid:"1863105321", gidVendas:"2134594156"},
-  {label:"Agosto 2026",   gid:"1281954097", gidVendas:"1825436777"},
+  {label:"Agosto 2026",   gid:"",           gidVendas:""},
   {label:"Setembro 2026", gid:"",           gidVendas:""},
   {label:"Outubro 2026",  gid:"",           gidVendas:""},
   {label:"Novembro 2026", gid:"",           gidVendas:""},
@@ -718,13 +718,10 @@ async function carregarDadosGSheets(){
       var loginRaw  = C.login  !== -1 ? String(r[C.login]||'').trim()  : '';
       var senhaRaw  = C.senha  !== -1 ? String(r[C.senha]||'').trim()  : '';
 
-      // Login válido = apenas letras/números/._- , sem "R$", vírgulas de decimal, datas etc.
-var loginValido = loginRaw &&
-  /^[a-zA-Z\u00C0-\u00FF][a-zA-Z\u00C0-\u00FF0-9._-]{1,29}$/.test(loginRaw) &&
-  loginRaw.toUpperCase().indexOf('R$') === -1;
-if(!loginValido){
-  loginRaw = nome.trim().split(/\s+/)[0].toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      // Valida login: rejeita se parecer data ou serial
+      if(/^\d{2}\/\d{2}(\/\d{2,4})?$/.test(loginRaw) || /^\d{5,}$/.test(loginRaw) || !loginRaw){
+        loginRaw = nome.trim().split(/\s+/)[0].toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       }
 
       // Valida senha: rejeita concatenações de datas
@@ -1748,12 +1745,8 @@ function handleArquivo(e){
         var meta=parseBRL(String(r[C.meta]||''));
         var loginRaw=C.login!==-1?String(r[C.login]||'').trim():'';
         var senhaRaw=C.senha!==-1?String(r[C.senha]||'').trim():'';
-        var loginValidoUp = loginRaw &&
-  /^[a-zA-Z\u00C0-\u00FF][a-zA-Z\u00C0-\u00FF0-9._-]{1,29}$/.test(loginRaw) &&
-  loginRaw.toUpperCase().indexOf('R$') === -1;
-if(!loginValidoUp){
-  loginRaw=nome.trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-}
+        if(/^\d{2}\/\d{2}(\/\d{2,4})?$/.test(loginRaw)||/^\d{5,}$/.test(loginRaw)||!loginRaw){
+          loginRaw=nome.trim().split(/\s+/)[0].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         }
         if(/^\d{2}\/\d{2}\/\d{4}\d{2}\/\d{2}\/\d{4}/.test(senhaRaw)){senhaRaw='';}
         var qtd=C.qtd!==-1?(Math.round(parseFloat(String(r[C.qtd]||'').replace(/,/g,'.').replace(/[^\d.]/g,'')))||0):0;
